@@ -59,7 +59,12 @@ Examples: `4d6dl1`, `1d20+5`, `2d8+3`. Show the player the command and its outpu
 - **`session-start`** — open or resume a play session. Loads campaign + character + prior-session context, creates `sessions/NNN.md`, brings you up to speed on where the fiction left off.
 - **`session-end`** — close a play session. Snapshots final state to the session log and `state.md` so future resumes are clean.
 - **`encounter-build`** — build a balanced 5e encounter against the active character using DMG XP-budget rules. Invoke when prepping or improvising combat / skill challenges.
+- **`combat`** — run a combat encounter end-to-end: initiative, turns, attacks, saves, damage, conditions, XP, loot. Updates the encounter's `## Live State` block after every event so combat survives interruption.
 - **`quest`** — scaffold a quest with hook, objective, complication, stakes, and reward. Invoke when seeding a new quest hook into the active campaign.
+- **`level-up`** — advance the active character one level: HP, hit dice, class/subclass features, ASI / feat, spell slots, proficiency bonus, derived stats.
+- **`long-rest`** — apply a long rest: full HP, all spell slots, half hit dice back, exhaustion −1, long-rest abilities reset.
+- **`short-rest`** — apply a short rest: optional hit-dice spending to heal, short-rest abilities reset (Warlock slots, Action Surge, ki, Channel Divinity, etc.).
+- **`inventory`** — add / remove / buy / sell / equip / list / transfer items. Recomputes weight, carrying capacity, currency, attunement.
 
 ## File Conventions
 

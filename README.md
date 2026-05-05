@@ -31,7 +31,11 @@ Then, inside Claude Code, invoke a skill:
 - `/session-start` — open or resume a play session
 - `/session-end` — close the session, snapshot state for next time
 - `/encounter-build` — DMG-balanced combat or skill encounter
+- `/combat` — run an encounter end-to-end with live initiative/HP tracking
 - `/quest` — scaffold a quest hook for the active campaign
+- `/level-up` — advance the active character one level
+- `/long-rest`, `/short-rest` — apply 5e rest mechanics
+- `/inventory` — manage equipment, currency, attunement
 
 ## Skills
 
@@ -42,7 +46,12 @@ Then, inside Claude Code, invoke a skill:
 | `session-start` | Loads campaign + character + prior-session context. Detects fresh, interrupted-resume, or mid-combat-resume mode. Creates the next `sessions/NNN.md` with a recap. |
 | `session-end` | Audits live state on disk, runs a close-out interview, appends an `## End-of-Session` block with cliffhanger / open threads / XP, marks the session closed. |
 | `encounter-build` | Builds combat using the DMG XP-threshold table (levels 1–20), encounter multiplier, and the solo "fewer than three PCs" adjustment. Picks monsters from any official 5e source. |
+| `combat` | Runs a combat encounter end-to-end: initiative, turns, attacks, saves, damage, conditions, recharges, death saves, XP, loot. Updates the encounter's `## Live State` block after every event for full mid-combat resume. |
 | `quest` | Lightweight five-field spine (hook, objective, complication, stakes, reward) plus NPC / location / faction connections. |
+| `level-up` | Advances the active character one level: HP roll/average, hit dice, class & subclass features, ASI / feat, spell slots, proficiency bonus, derived stats. Appends to the level history. |
+| `long-rest` | Restores HP, all spell slots, half hit dice (rounded down, min 1), reduces exhaustion by 1, resets long-rest abilities. Honors PHB / gritty / heroic resting variants. |
+| `short-rest` | Optional hit-dice spending (rolled live), recharges short-rest abilities (Warlock slots, Action Surge, Second Wind, ki, Channel Divinity, etc.). |
+| `inventory` | Add / remove / buy / sell / equip / list / transfer items. Recomputes total weight, carrying capacity, encumbrance, currency, and attunement slots. |
 
 ## Dice
 
@@ -73,7 +82,12 @@ The script (`scripts/roll.ts`) uses `crypto.getRandomValues` with rejection samp
 │       ├── session-start/SKILL.md
 │       ├── session-end/SKILL.md
 │       ├── encounter-build/SKILL.md
-│       └── quest/SKILL.md
+│       ├── combat/SKILL.md
+│       ├── quest/SKILL.md
+│       ├── level-up/SKILL.md
+│       ├── long-rest/SKILL.md
+│       ├── short-rest/SKILL.md
+│       └── inventory/SKILL.md
 ├── .claude               # symlink → .agents
 ├── scripts/
 │   └── roll.ts           # Bun dice script
@@ -112,6 +126,6 @@ The repo follows the `AGENTS.md` convention with `CLAUDE.md` as a symlink, appli
 
 ## Status
 
-Working: campaign / character / session / encounter / quest skills, dice, live persistence.
+Working: campaign, character, session, encounter, combat, quest, level-up, rest, and inventory skills, plus dice and live persistence.
 
-Not yet built: `/level-up`, `/long-rest` and `/short-rest`, `/inventory` helpers, automated combat resolver. Most of these can still be done conversationally — the existing skills cover the structured-state operations.
+The structured-state operations are fully covered. Anything outside that scope (free-form roleplay, exploration, social encounters, downtime activities) is handled conversationally by the DM with the same live-persistence discipline.
