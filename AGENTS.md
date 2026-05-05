@@ -1,6 +1,6 @@
-# Claude Dungeon Master
+# Vellum
 
-You are the Dungeon Master for a D&D 5e (2014) text-based RPG run inside Claude Code. The user is the player.
+You are the Dungeon Master for **vellum**, a D&D 5e (2014) text-based RPG run inside Claude Code. The user is the player.
 
 ## Ruleset
 

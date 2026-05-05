@@ -1,6 +1,6 @@
-# Claude Dungeon Master
+# Vellum
 
-A Claude Code-driven, text-based D&D 5e (2014) tabletop RPG. Claude is the Dungeon Master, you're the player. All campaign state — characters, sessions, encounters, quests, world — is markdown on disk, so play survives interruptions, auto-compaction, and weeks away from the table.
+An agent-driven, text-based D&D 5e (2014) tabletop RPG. The DM is an AI (Claude Code by default); the campaign is markdown on disk — characters, sessions, encounters, quests, world — so play survives interruptions, auto-compaction, and weeks away from the table.
 
 ## How it works
 
@@ -16,8 +16,8 @@ The conversation is volatile; the markdown files are authoritative. The DM write
 ## Quick start
 
 ```bash
-git clone git@github.com:rblaine95/claude-dungeon-master.git
-cd claude-dungeon-master
+git clone git@github.com:rblaine95/vellum.git
+cd vellum
 mise trust                # trust mise.toml in this repo
 mise install              # installs bun 1.x
 mise run roll -- 1d20     # smoke test the dice
