@@ -1,0 +1,10 @@
+[settings]
+experimental = true
+minimum_release_age = "7d"
+
+[tools]
+bun = "1"
+
+[tasks.roll]
+description = "Roll dice using standard notation, e.g. 4d6dl1, 1d20+5"
+run = "bun run scripts/roll.ts"
