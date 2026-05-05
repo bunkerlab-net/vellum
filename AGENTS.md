@@ -50,7 +50,7 @@ Never invent rolls. For every random outcome, run:
 mise run roll -- <expression>
 ```
 
-Examples: `4d6dl1`, `1d20+5`, `2d8+3`. Show the player the command and its output before applying the result. Supported operators: `dlN` drop-lowest, `dhN` drop-highest, `khN` keep-highest, `klN` keep-lowest, `+N` / `-N` modifiers.
+Examples: `4d6dl1`, `1d20+5`, `2d8+3`, `1d20+3+1d4` (attack + Guidance), `1d8+3+3d6` (weapon + Sneak Attack), `1d20-1d4` (Bane). Show the player the command and its output before applying the result. Supported operators: `dlN` drop-lowest, `dhN` drop-highest, `khN` keep-highest, `klN` keep-lowest, `+N` / `-N` modifiers, and arbitrary chained `+` / `-` of dice and constants for compound rolls.
 
 ## Skills
 

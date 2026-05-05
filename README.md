@@ -58,14 +58,17 @@ Then, inside Claude Code, invoke a skill:
 All randomness flows through `mise run roll` — the DM never invents results.
 
 ```bash
-mise run roll -- 4d6dl1      # 4d6 drop lowest (stat rolling)
-mise run roll -- 1d20+5      # d20 with +5 modifier
-mise run roll -- 2d8+3       # 2d8 with +3 modifier
-mise run roll -- 4d6kh3      # 4d6 keep highest 3
-mise run roll -- 3d6kh2-1    # 3d6 keep highest 2, then -1
+mise run roll -- 4d6dl1       # 4d6 drop lowest (stat rolling)
+mise run roll -- 1d20+5       # d20 with +5 modifier
+mise run roll -- 2d8+3        # 2d8 with +3 modifier
+mise run roll -- 4d6kh3       # 4d6 keep highest 3
+mise run roll -- 3d6kh2-1     # 3d6 keep highest 2, then -1
+mise run roll -- 1d20+3+1d4   # attack + Guidance (compound)
+mise run roll -- 1d8+3+3d6    # weapon + Sneak Attack (compound)
+mise run roll -- 1d20-1d4     # Bane penalty die (compound)
 ```
 
-Operators: `dlN` drop-lowest, `dhN` drop-highest, `khN` keep-highest, `klN` keep-lowest, `+N` / `-N` flat modifier.
+Operators: `dlN` drop-lowest, `dhN` drop-highest, `khN` keep-highest, `klN` keep-lowest, `+N` / `-N` flat modifier. Chain dice and constants with `+` or `-` for compound rolls (Guidance, Bless, Sneak Attack, Bane, Bardic Inspiration).
 
 The script (`scripts/roll.ts`) uses `crypto.getRandomValues` with rejection sampling, so the distribution is unbiased.
 
