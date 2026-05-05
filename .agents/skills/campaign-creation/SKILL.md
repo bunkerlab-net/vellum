@@ -169,7 +169,9 @@ Read back a tight summary: setting, tone, premise, starting region, factions, th
 - **In-game date:** {{starting date or null}}
 - **Active quests:** []
 - **Last session:** null
-- **Session counter:** 0
+- **Last session status:** closed
+- **Last session real-world date:** null
+- **Where we left off:** null
 ````
 
 ### `world/regions.md`
