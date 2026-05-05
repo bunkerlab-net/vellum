@@ -16,7 +16,7 @@ The conversation is volatile; the markdown files are authoritative. The DM write
 ## Quick start
 
 ```bash
-git clone git@github.com:rblaine95/vellum.git
+git clone git@github.com:bunkerlab-net/vellum.git
 cd vellum
 mise trust                # trust mise.toml in this repo
 mise install              # installs bun 1.x
