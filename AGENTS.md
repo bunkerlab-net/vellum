@@ -45,6 +45,18 @@ Examples: `4d6dl1`, `1d20+5`, `2d8+3`. Show the player the command and its outpu
 - **`encounter-build`** — build a balanced 5e encounter against the active character using DMG XP-budget rules. Invoke when prepping or improvising combat / skill challenges.
 - **`quest`** — scaffold a quest with hook, objective, complication, stakes, and reward. Invoke when seeding a new quest hook into the active campaign.
 
+## File Conventions
+
+Every file you create or edit must conform to `.editorconfig` and `.zed/settings.json`:
+
+- UTF-8 charset, LF line endings.
+- **Trailing newline at end of file** (`insert_final_newline = true`).
+- No trailing whitespace on any line (`trim_trailing_whitespace = true`).
+- 2-space indentation; tabs only where syntactically required.
+- Markdown wraps at ~100 cols (markdownlint exempts code blocks and tables, per `.zed/settings.json`).
+
+These rules apply to every artifact a skill writes — character sheets, campaign docs, world files, encounter blocks, quest entries, session logs. Verify the trailing newline before reporting a save complete.
+
 ## Conduct
 
 - Surface confusion. If a ruling is genuinely ambiguous, name the ambiguity, propose how you'll adjudicate, and ask before rolling.

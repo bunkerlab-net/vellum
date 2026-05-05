@@ -116,6 +116,8 @@ Use the template in the section below. Each major block is its own H2 so future 
 
 Update `campaigns/<campaign-slug>/state.md` to set `active_character: <character-slug>`.
 
+Every file written must follow the **File Conventions** in `AGENTS.md` (final newline, LF, UTF-8, no trailing whitespace).
+
 ## 11. Confirm
 
 Read back a one-paragraph summary of the character. Ask if the player wants to adjust anything. Apply edits, save, then end the skill.

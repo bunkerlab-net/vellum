@@ -110,6 +110,8 @@ Write to `campaigns/<slug>/encounters/<encounter-slug>.md` using the template. C
 
 Do **not** mark the encounter as "used" yet — that happens when a session log references it.
 
+Every file written must follow the **File Conventions** in `AGENTS.md` (final newline, LF, UTF-8, no trailing whitespace).
+
 ## 10. Confirm
 
 Read back: difficulty target, monsters chosen with CR/XP, adjusted XP vs. threshold, terrain summary. Ask the player if anything should change. Apply edits, save.

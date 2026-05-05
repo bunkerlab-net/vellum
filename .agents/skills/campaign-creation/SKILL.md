@@ -95,6 +95,8 @@ campaigns/<slug>/
 
 Use the templates below. Fill in everything captured during the interview.
 
+Every file written must follow the **File Conventions** in `AGENTS.md` (final newline, LF, UTF-8, no trailing whitespace).
+
 ## 10. Confirm
 
 Read back a tight summary: setting, tone, premise, starting region, factions, the headline house rules. Ask if the player wants to adjust anything. Apply edits, save, end the skill. Suggest `/character-creation` as the next step if no PC exists yet.

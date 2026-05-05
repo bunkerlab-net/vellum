@@ -50,6 +50,8 @@ Write to `campaigns/<slug>/quests/<quest-slug>.md`. Use a descriptive slug (e.g.
 
 If the quest is being accepted right now (not just seeded), update `campaigns/<slug>/state.md` to add the quest slug to `active_quests`.
 
+Every file written must follow the **File Conventions** in `AGENTS.md` (final newline, LF, UTF-8, no trailing whitespace).
+
 ## 6. Confirm
 
 Summarize the quest in one paragraph from the player's perspective (just the hook + objective, *not* the complication or DM notes). Ask if it lands. Adjust, save, end the skill.
