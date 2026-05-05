@@ -1,0 +1,4 @@
+## Claude Local Settings
+.claude/*.local.json
+.agents/*.local.json
+CLAUDE.local.md
