@@ -2,3 +2,6 @@
 .claude/*.local.json
 .agents/*.local.json
 CLAUDE.local.md
+
+## Campaign Data (user playthroughs are not part of the harness)
+campaigns/
