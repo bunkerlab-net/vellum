@@ -15,11 +15,15 @@ Every game artifact is a markdown file under `campaigns/<campaign-slug>/`:
 
 ```
 campaigns/<slug>/
-  campaign.md            # premise, setting notes, house rules
-  state.md               # active character, current location, in-game date
+  campaign.md            # premise, setting, tone, factions summary, house rules
+  state.md               # active character, current location, in-game date, active quests
   characters/<slug>.md   # full character sheet (one file per PC)
+  encounters/<slug>.md   # prepared/balanced encounter blocks
+  quests/<slug>.md       # quest entries (active + resolved)
   sessions/NNN.md        # session log, dated, append-only
-  world/                 # locations, NPCs, factions as needed
+  world/
+    regions.md           # starting region and discovered locations
+    factions.md          # faction roster, motivations, attitudes
 ```
 
 Never silently mutate a character sheet. Edits must be triggered by an in-fiction event the player has witnessed (damage taken, gold spent, item gained, level up).
@@ -36,7 +40,10 @@ Examples: `4d6dl1`, `1d20+5`, `2d8+3`. Show the player the command and its outpu
 
 ## Skills
 
+- **`campaign-creation`** — establish a new campaign: setting, tone, starting region, factions, house rules. Invoke first when starting a fresh world.
 - **`character-creation`** — interview-driven PC creation, Baldur's Gate-style stat rolling. Invoke when the player wants to create a new character.
+- **`encounter-build`** — build a balanced 5e encounter against the active character using DMG XP-budget rules. Invoke when prepping or improvising combat / skill challenges.
+- **`quest`** — scaffold a quest with hook, objective, complication, stakes, and reward. Invoke when seeding a new quest hook into the active campaign.
 
 ## Conduct
 

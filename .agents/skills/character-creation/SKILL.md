@@ -20,12 +20,7 @@ Ask: "Which campaign is this character for?"
 
 - List existing campaigns: `ls campaigns/` (ignore `.gitkeep`).
 - If the player picks an existing slug, use it.
-- If new, ask for a campaign name and derive a slug (lowercase, hyphenated). Create:
-  - `campaigns/<slug>/campaign.md` — title, premise (TBD), house rules (none yet).
-  - `campaigns/<slug>/characters/`
-  - `campaigns/<slug>/sessions/`
-  - `campaigns/<slug>/world/`
-  - `campaigns/<slug>/state.md` — front-matter with `active_character: null`, `location: null`, `in_game_date: null`.
+- If no campaigns exist (or the player wants a new one), recommend running `/campaign-creation` first so the world, factions, and starting region are set before the character exists in them. If the player insists on a stub campaign, create the minimum scaffold (`campaign.md`, `state.md`, `characters/`, `encounters/`, `quests/`, `sessions/`, `world/`) and proceed.
 
 ## 2. Ability Scores (Baldur's Gate-Style)
 
