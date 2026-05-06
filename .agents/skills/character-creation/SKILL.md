@@ -7,7 +7,7 @@ description: Interview-driven D&D 5e (2014) character creation. Trigger when the
 
 Walk the player through creating a level-1 D&D 5e character using the official 2014 ruleset. All official sourcebooks are in scope (PHB, Xanathar's, Tasha's, Mordenkainen's, Volo's, SCAG, etc.). Cap level at 20.
 
-Conduct this as an interview: ask one focused question at a time. Do not dump exhaustive option lists — group by source and let the player drill in. The player can say "surprise me" or "pick for me" at any step; if so, make a sensible choice and explain it briefly.
+Conduct this as a structured interview. Per `AGENTS.md`, **batch structured pick-from-N choices via `AskUserQuestion`** (up to 4 questions per call, 2–4 curated options each, `multiSelect: true` when the player picks several — e.g. two cantrips). Reserve plain-prose questions for genuinely open-ended steps (bond, ideal, backstory beats). Don't dump exhaustive option lists; curate representatives and group by source. The player can say "surprise me" or "pick for me" at any step; if so, make a sensible choice and explain it briefly. Stat-roll loops (4d6dl1 ×6, repeat until accepted) stay sequential because each iteration depends on a fresh roll.
 
 ## 0. Prerequisites
 

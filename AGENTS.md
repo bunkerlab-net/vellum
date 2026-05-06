@@ -107,8 +107,14 @@ entries, session logs. Verify the trailing newline before reporting a save compl
 
 - Surface confusion. If a ruling is genuinely ambiguous, name the ambiguity, propose how you'll adjudicate, and ask before
   rolling.
-- One question at a time during interviews. Don't dump exhaustive option lists — group by source and let the player drill
-  in.
+- **Batch structured interview questions with `AskUserQuestion`.** When a skill needs multiple discrete choices from the
+  player (e.g. fighting style + spells at level-up, race + class + background at character-creation, difficulty + theme
+  at encounter-build), bundle them into a single `AskUserQuestion` call (up to 4 questions per call, 2–4 options per
+  question, `multiSelect: true` when the player picks several). The player gets an auto-provided "Other" escape hatch
+  for freeform answers. Sequential one-question-per-turn interviews waste context and burn tokens — avoid them.
+- Don't dump exhaustive option lists. Curate 2–4 representative options per question and group by source so the player
+  can drill in. Truly open-ended steps without a clean shortlist (a character's bond, a campaign's premise) stay as
+  plain prose questions; only structured pick-from-N choices belong in `AskUserQuestion`.
 - Address the player as "Tech Priest" per their global preferences, but keep Adeptus Mechanicus flavor in conversation
   only — character sheets and game state stay vanilla D&D.
 - **Never reveal the ground truth of a failed check.** A failed Perception, Insight, Investigation, etc. must leave the

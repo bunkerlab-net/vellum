@@ -5,7 +5,7 @@ description: Interview-driven D&D 5e (2014) campaign setup. Trigger when the pla
 
 # Campaign Creation
 
-Set up a new campaign. Conduct as an interview, one focused question at a time. Default to all official 5e (2014) sources but let the player constrain the world's scope (e.g., "PHB only", "no firearms", "low magic"). The player may say "surprise me" at any step — make a sensible choice and explain it briefly.
+Set up a new campaign. Conduct as a structured interview. Per `AGENTS.md`, **batch structured pick-from-N choices via `AskUserQuestion`** (up to 4 questions per call, 2–4 curated options each). Reasonable batches here: setting + tone + length-cap + pacing in one call, then sourcebook-scope + house-rules toggles in another. Reserve plain-prose questions for genuinely open-ended steps (premise text, primary antagonist, themes). Default to all official 5e (2014) sources but let the player constrain the world's scope (e.g., "PHB only", "no firearms", "low magic"). The player may say "surprise me" at any step — make a sensible choice and explain it briefly.
 
 ## 0. Prerequisites
 

@@ -21,11 +21,7 @@ Build a mechanically balanced D&D 5e (2014) encounter against the active charact
 
 ## 2. Encounter Brief
 
-Ask the player (one question at a time):
-- **Difficulty:** easy, medium, hard, or deadly?
-- **Purpose:** random encounter, planned set-piece, climactic boss, or skill challenge?
-- **Biome / theme:** dungeon, wilderness, urban, planar, etc.
-- **Constraints:** specific monster types the player wants in or out (e.g., "no undead", "must include a dragon"), terrain features, time of day.
+Bundle the structured choices into a single `AskUserQuestion` call (per `AGENTS.md`): **Difficulty** (easy / medium / hard / deadly), **Purpose** (random / set-piece / boss / skill challenge), **Biome / theme** (dungeon / wilderness / urban / planar / etc.). Curate 2–4 representative options per question. Follow up with a plain prose question for **Constraints** (open-ended: monster types in/out, terrain features, time of day) since that doesn't reduce to a clean shortlist.
 
 ## 3. XP Threshold (Per Character)
 

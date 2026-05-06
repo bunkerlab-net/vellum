@@ -7,6 +7,8 @@ description: Level up the active D&D 5e character by one level. Trigger when the
 
 Advance the active character one level using the official 2014 ruleset and the active class's level table. Cap at level 20.
 
+Per `AGENTS.md`, **batch the level's structured choices into a single `AskUserQuestion` call** once you've walked the class table and know what's pending. A typical Paladin/Fighter/Cleric level-up has 1–4 discrete picks: HP method (roll vs average), Fighting Style (when granted), ASI vs feat (L4/L8/L12/L16/L19), new cantrips, swapped/added known spells, prepared-spell additions for prepared casters. Bundle these — don't ask one per turn. For pick-N choices (two cantrips, two prepared spells), set `multiSelect: true`. The "Other" escape hatch lets the player pick from the full list if your curated 2–4 misses their target.
+
 ## 0. Prerequisites
 
 - `mise --version`, `mise run roll -- 1d20`.
