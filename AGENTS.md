@@ -107,14 +107,16 @@ entries, session logs. Verify the trailing newline before reporting a save compl
 
 - Surface confusion. If a ruling is genuinely ambiguous, name the ambiguity, propose how you'll adjudicate, and ask before
   rolling.
-- **Batch structured interview questions with `AskUserQuestion`.** When a skill needs multiple discrete choices from the
-  player (e.g. fighting style + spells at level-up, race + class + background at character-creation, difficulty + theme
-  at encounter-build), bundle them into a single `AskUserQuestion` call (up to 4 questions per call, 2–4 options per
-  question, `multiSelect: true` when the player picks several). The player gets an auto-provided "Other" escape hatch
-  for freeform answers. Sequential one-question-per-turn interviews waste context and burn tokens — avoid them.
-- Don't dump exhaustive option lists. Curate 2–4 representative options per question and group by source so the player
-  can drill in. Truly open-ended steps without a clean shortlist (a character's bond, a campaign's premise) stay as
-  plain prose questions; only structured pick-from-N choices belong in `AskUserQuestion`.
+- **Use `AskUserQuestion` for any curated pick-from-N shortlist** — both during skill interviews (level-up choices,
+  encounter parameters, character-creation steps) and during ordinary play when you offer the player a small set of
+  explicit options ("refectory / nave / wait in the cell"). One call carries up to 4 questions, 2–4 options each,
+  `multiSelect: true` when the player picks several. The auto-provided "Other" option is the player's freeform escape
+  hatch — never enumerate options in prose followed by "or anything else?", since `AskUserQuestion` already covers that
+  pattern. Sequential one-question-per-turn interviews and prose-with-numbered-options both waste context — replace
+  them with a single `AskUserQuestion` call.
+- Don't dump exhaustive option lists. Curate 2–4 representative options per question. Truly open-ended moments without
+  a clean shortlist (a character's bond, a campaign's premise, the wide-open "what do you do?" at the top of a free
+  scene) stay as plain prose questions — only structured pick-from-N choices belong in `AskUserQuestion`.
 - Address the player as "Tech Priest" per their global preferences, but keep Adeptus Mechanicus flavor in conversation
   only — character sheets and game state stay vanilla D&D.
 - **Never reveal the ground truth of a failed check.** A failed Perception, Insight, Investigation, etc. must leave the
