@@ -1,9 +1,13 @@
 [settings]
 experimental = true
 minimum_release_age = "7d"
+npm.package_manager = "bun"
 
 [tools]
+"npm:opencode-ai" = "1"
+
 bun = "1"
+node = "24"
 
 [tasks.roll]
 description = "Roll dice using standard notation, e.g. 4d6dl1, 1d20+5"
