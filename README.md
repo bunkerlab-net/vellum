@@ -16,8 +16,9 @@ happens, so any session can resume cleanly — even after a context-window cut o
 
 ## Requirements
 
-- [Claude Code](https://docs.claude.com/en/docs/claude-code) (or any agent that respects `AGENTS.md` + skills)
-- [mise](https://mise.jdx.dev) — manages tool versions and the dice task
+- [Claude Code](https://docs.claude.com/en/docs/claude-code), [OpenCode](https://opencode.ai/)
+  (or any agent that respects `AGENTS.md` + skills)
+- [mise](https://mise.jdx.dev) — manages tool versions and the scripts
 
 ## Quick start
 
