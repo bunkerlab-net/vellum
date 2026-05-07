@@ -14,9 +14,9 @@ Conduct this as a structured interview. Per `AGENTS.md`, **batch structured pick
 - Confirm `mise` is available: `mise --version`. If not, stop and report.
 - Confirm the dice task works: `mise run roll -- 1d20`. If it errors, stop and report.
 
-## 1. Campaign Context
+## 1. Campaign & Player
 
-Ask: "Which campaign is this character for?"
+Ask: "Which campaign is this character for, and what is your player name?"
 
 - List existing campaigns: `ls campaigns/` (ignore `.gitkeep`).
 - If the player picks an existing slug, use it.
@@ -129,7 +129,7 @@ Read back a one-paragraph summary of the character. Ask if the player wants to a
 ````markdown
 # {{Character Name}}
 
-- **Player:** Tech Priest
+- **Player:** {{player_name}}
 - **Race / Subrace:** {{race}} ({{subrace}})
 - **Class / Subclass:** {{class}} ({{subclass}}) — Level 1
 - **Background:** {{background}}
