@@ -5,7 +5,7 @@ description: Interview-driven D&D 5e (2014) campaign setup. Trigger when the pla
 
 # Campaign Creation
 
-Set up a new campaign. Conduct as a structured interview. Per `AGENTS.md`, **batch structured pick-from-N choices via `AskUserQuestion`** (up to 4 questions per call, 2–4 curated options each). Reasonable batches here: setting + tone + length-cap + pacing in one call, then sourcebook-scope + house-rules toggles in another. Reserve plain-prose questions for genuinely open-ended steps (premise text, primary antagonist, themes). Default to all official 5e (2014) sources but let the player constrain the world's scope (e.g., "PHB only", "no firearms", "low magic"). The player may say "surprise me" at any step — make a sensible choice and explain it briefly.
+Set up a new campaign. Conduct as a structured interview. Per `AGENTS.md`, **batch structured pick-from-N choices via `AskUserQuestion`** (up to 4 questions per call, 2–4 curated options each). Reasonable batches here: setting + tone + length-cap + pacing in one call, then difficulty + sourcebook-scope + house-rules toggles in another. Reserve plain-prose questions for genuinely open-ended steps (premise text, primary antagonist, themes). Default to all official 5e (2014) sources but let the player constrain the world's scope (e.g., "PHB only", "no firearms", "low magic"). The player may say "surprise me" at any step — make a sensible choice and explain it briefly.
 
 ## 0. Prerequisites
 
@@ -65,9 +65,29 @@ Capture 2–4 factions for `world/factions.md`. For each:
 - Default attitude toward the PC: friendly, neutral, suspicious, hostile.
 - 1–2 named NPCs the player might meet.
 
-## 8. House Rules
+## 8. Difficulty & House Rules
+
+### Difficulty
+
+Pick one — affects encounter tuning and DM leniency throughout the campaign:
+
+- **Easy** — encounter-build biases easy/medium; the DM softens consequences when the fiction allows.
+- **Standard** — PHB defaults; encounter-build picks freely.
+- **Hard** — encounter-build biases hard/deadly; resources are scarcer, consequences land.
+- **Hardcore** — **permadeath**. Resurrection magic (Revivify, Raise Dead, Resurrection, True Resurrection, Reincarnate, Wish-as-revive) is unavailable for the PC. Three failed death saves ends the character permanently — no narrative rescue, no retcon. Encounter-build biases hard/deadly.
+
+**Hardcore lock — one-way boundary:**
+
+- A campaign that **starts outside** Hardcore can never enter Hardcore. The choice at creation closes that door for the life of the campaign.
+- A campaign that **starts in** Hardcore stays in Hardcore. It cannot be downgraded.
+- Among easy / standard / hard the player may move freely mid-campaign by editing `campaign.md`. The `Started in Hardcore` field is **immutable** and is what enforces the boundary.
+
+Before recording **Hardcore** at creation, read the permadeath consequences back to the player verbatim and require explicit confirmation. Record both `Difficulty` and `Started in Hardcore` on `campaign.md`.
+
+### House Rules
 
 Confirm or override defaults. Record on `campaign.md`:
+
 - Critical hits: max die + roll (PHB default) vs. doubled dice vs. brutal critical.
 - Resting: PHB (short = 1hr, long = 8hr) vs. gritty realism (short = 8hr, long = 7 days) vs. heroic (short = 5min, long = 1hr).
 - Death saves: standard PHB.
@@ -99,7 +119,7 @@ Every file written must follow the **File Conventions** in `AGENTS.md` (final ne
 
 ## 10. Confirm
 
-Read back a tight summary: setting, tone, premise, starting region, factions, the headline house rules. Ask if the player wants to adjust anything. Apply edits, save, end the skill. Suggest `/character-creation` as the next step if no PC exists yet.
+Read back a tight summary: setting, tone, difficulty (call out Hardcore explicitly if selected, including the lock), premise, starting region, factions, the headline house rules. Ask if the player wants to adjust anything. Apply edits, save, end the skill. Suggest `/character-creation` as the next step if no PC exists yet.
 
 ---
 
@@ -115,9 +135,13 @@ Read back a tight summary: setting, tone, premise, starting region, factions, th
 - **Tone:** {{tone}}
 - **Length / Cap:** {{length}}
 - **Pacing:** {{milestone | xp}}
+- **Difficulty:** {{easy | standard | hard | hardcore}}
+- **Started in Hardcore:** {{yes | no}}
 - **Created:** {{ISO date}}
 - **Source rules:** D&D 5e (2014)
 - **Sourcebook scope:** {{all official | restricted to ...}}
+
+> **Difficulty rule.** If **Started in Hardcore** is `yes`, difficulty is permanently Hardcore — permadeath, no resurrection magic, three failed death saves ends the character. If **Started in Hardcore** is `no`, difficulty may shift among easy / standard / hard during play (edit this file), but Hardcore can never be entered later.
 
 ## Premise
 
