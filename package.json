@@ -1,27 +1,27 @@
 {
-	"name": "vellum",
-	"version": "0.1.0",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"astro": "astro",
-		"build": "astro build",
-		"clean": "rm -rf dist node_modules .astro .vite *.tsbuildinfo",
-		"dev": "bun run server/cli.ts --dev",
-		"start": "bun run server/cli.ts"
-	},
-	"dependencies": {
-		"@astrojs/react": "^5.0.4",
-		"astro": "^6.3.1",
-		"react": "^19.2.6",
-		"react-dom": "^19.2.6",
-		"react-markdown": "^10.1.0",
-		"remark-gfm": "^4.0.1"
-	},
-	"devDependencies": {
-		"@types/bun": "^1.3.13",
-		"@types/react": "^19.2.14",
-		"@types/react-dom": "^19.2.3",
-		"typescript": "^6.0.3"
-	}
+  "name": "vellum",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "astro": "astro",
+    "build": "astro build",
+    "clean": "rm -rf dist node_modules .astro .vite *.tsbuildinfo",
+    "dev": "bun run server/cli.ts --dev",
+    "start": "bun run server/cli.ts"
+  },
+  "dependencies": {
+    "@astrojs/react": "^5.0.4",
+    "astro": "^6.3.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3"
+  }
 }
