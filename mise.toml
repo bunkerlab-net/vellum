@@ -5,9 +5,14 @@ npm.package_manager = "bun"
 
 [tools]
 "npm:opencode-ai" = "1"
+"npm:sort-package-json" = "3.6"
 
+biome = "2"
 bun = "1"
+hk = "1.44.3"
 node = "24"
+pkl = "0.31"
+usage = "latest"
 
 [tasks.roll]
 description = "Roll dice using standard notation, e.g. 4d6dl1, 1d20+5"
