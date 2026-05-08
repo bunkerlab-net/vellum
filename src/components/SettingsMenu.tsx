@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { Settings } from "../client/settings";
 
 interface Props {
@@ -31,6 +32,18 @@ export default function SettingsMenu({
 	onChange,
 	onClose,
 }: Props) {
+	useEffect(() => {
+		if (!open) return;
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.preventDefault();
+				onClose();
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [open, onClose]);
+
 	if (!open) return null;
 	return (
 		<>
@@ -40,14 +53,28 @@ export default function SettingsMenu({
 				className="settings-scrim"
 				onClick={onClose}
 			/>
-			<div className="settings-popover" role="dialog" aria-label="Settings">
+			<div
+				className="settings-popover"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Settings"
+			>
 				<div className="settings-section">
-					<div className="settings-label">Palette</div>
-					<div className="settings-palette-row">
+					<div id="settings-palette-label" className="settings-label">
+						Palette
+					</div>
+					{/* biome-ignore lint/a11y/useSemanticElements: fieldset would alter layout; div + role="group" preserves the flex row design */}
+					<div
+						className="settings-palette-row"
+						role="group"
+						aria-labelledby="settings-palette-label"
+					>
 						{PALETTES.map((p) => (
 							<button
 								key={p.value}
 								type="button"
+								aria-label={`${p.value} palette`}
+								aria-pressed={settings.palette === p.value}
 								className={`settings-palette ${settings.palette === p.value ? "active" : ""}`}
 								onClick={() => onChange("palette", p.value)}
 								title={p.value}
@@ -65,8 +92,11 @@ export default function SettingsMenu({
 				</div>
 
 				<div className="settings-section">
-					<div className="settings-label">Heading font</div>
+					<label htmlFor="settings-heading-font" className="settings-label">
+						Heading font
+					</label>
 					<select
+						id="settings-heading-font"
 						className="settings-select"
 						value={settings.headingFont}
 						onChange={(e) => onChange("headingFont", e.target.value)}
@@ -80,8 +110,11 @@ export default function SettingsMenu({
 				</div>
 
 				<div className="settings-section">
-					<div className="settings-label">Body font</div>
+					<label htmlFor="settings-body-font" className="settings-label">
+						Body font
+					</label>
 					<select
+						id="settings-body-font"
 						className="settings-select"
 						value={settings.bodyFont}
 						onChange={(e) => onChange("bodyFont", e.target.value)}
@@ -95,12 +128,21 @@ export default function SettingsMenu({
 				</div>
 
 				<div className="settings-section">
-					<div className="settings-label">Story reveal</div>
-					<div className="settings-radio-row">
+					<div id="settings-story-label" className="settings-label">
+						Story reveal
+					</div>
+					<div
+						className="settings-radio-row"
+						role="radiogroup"
+						aria-labelledby="settings-story-label"
+					>
 						{STORY_MODES.map((m) => (
+							// biome-ignore lint/a11y/useSemanticElements: pill-style buttons by design; native radios would lose the styling
 							<button
 								key={m}
 								type="button"
+								role="radio"
+								aria-checked={settings.storyMode === m}
 								className={`settings-radio ${settings.storyMode === m ? "active" : ""}`}
 								onClick={() => onChange("storyMode", m)}
 							>
@@ -111,8 +153,11 @@ export default function SettingsMenu({
 				</div>
 
 				<div className="settings-section">
-					<div className="settings-label">Ornament density</div>
+					<label htmlFor="settings-ornament-density" className="settings-label">
+						Ornament density
+					</label>
 					<input
+						id="settings-ornament-density"
 						type="range"
 						min={0}
 						max={10}

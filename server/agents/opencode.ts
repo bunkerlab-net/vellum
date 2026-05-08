@@ -12,8 +12,9 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
 			return sessionId;
 		},
 		async send(text: string) {
-			queued = queued.then(() => runOnce(text));
-			await queued;
+			const p = queued.then(() => runOnce(text));
+			queued = p.catch(() => {});
+			await p;
 		},
 		interrupt() {
 			activeProc?.kill("SIGINT");
@@ -32,6 +33,7 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
 			"json",
 			...(sessionId ? ["--session", sessionId] : []),
 			...spawn.argv,
+			"--",
 			text,
 		];
 		const proc = Bun.spawn({

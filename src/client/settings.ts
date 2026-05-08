@@ -83,26 +83,69 @@ const PALETTES: Record<Settings["palette"], Record<string, string>> = {
 	},
 };
 
+function sanitizeFontName(name: unknown, fallback: string): string {
+	if (typeof name !== "string") return fallback;
+	const cleaned = name.replace(/[^A-Za-z0-9 -]/g, "").trim();
+	return cleaned || fallback;
+}
+
+function validate(parsed: unknown): Partial<Settings> {
+	if (!parsed || typeof parsed !== "object") return {};
+	const p = parsed as Record<string, unknown>;
+	const out: Partial<Settings> = {};
+	if (
+		p.palette === "ember" ||
+		p.palette === "crimson" ||
+		p.palette === "forest" ||
+		p.palette === "void"
+	) {
+		out.palette = p.palette;
+	}
+	if (
+		p.storyMode === "typewriter" ||
+		p.storyMode === "illuminated" ||
+		p.storyMode === "instant"
+	) {
+		out.storyMode = p.storyMode;
+	}
+	if (typeof p.headingFont === "string") {
+		out.headingFont = sanitizeFontName(p.headingFont, DEFAULTS.headingFont);
+	}
+	if (typeof p.bodyFont === "string") {
+		out.bodyFont = sanitizeFontName(p.bodyFont, DEFAULTS.bodyFont);
+	}
+	if (
+		typeof p.ornamentDensity === "number" &&
+		Number.isFinite(p.ornamentDensity)
+	) {
+		out.ornamentDensity = Math.min(10, Math.max(0, p.ornamentDensity));
+	}
+	if (typeof p.soundOn === "boolean") out.soundOn = p.soundOn;
+	return out;
+}
+
 function load(): Settings {
 	if (typeof window === "undefined") return DEFAULTS;
 	try {
 		const raw = window.localStorage.getItem(KEY);
 		if (!raw) return DEFAULTS;
-		const parsed = JSON.parse(raw);
-		return { ...DEFAULTS, ...parsed };
+		return { ...DEFAULTS, ...validate(JSON.parse(raw)) };
 	} catch {
 		return DEFAULTS;
 	}
 }
 
 function applyToRoot(s: Settings) {
+	if (typeof document === "undefined" || !document.documentElement) return;
 	const root = document.documentElement;
 	const palette = PALETTES[s.palette] ?? PALETTES.ember;
 	for (const [k, v] of Object.entries(palette)) {
 		root.style.setProperty(k, v);
 	}
-	root.style.setProperty("--font-heading", `"${s.headingFont}", serif`);
-	root.style.setProperty("--font-body", `"${s.bodyFont}", serif`);
+	const heading = sanitizeFontName(s.headingFont, DEFAULTS.headingFont);
+	const body = sanitizeFontName(s.bodyFont, DEFAULTS.bodyFont);
+	root.style.setProperty("--font-heading", `"${heading}", serif`);
+	root.style.setProperty("--font-body", `"${body}", serif`);
 	root.style.setProperty(
 		"--ornament-opacity",
 		String(0.2 + (s.ornamentDensity / 10) * 0.8),
@@ -120,7 +163,11 @@ export function useSettings() {
 	useEffect(() => {
 		if (typeof window === "undefined") return;
 		applyToRoot(settings);
-		window.localStorage.setItem(KEY, JSON.stringify(settings));
+		try {
+			window.localStorage.setItem(KEY, JSON.stringify(settings));
+		} catch (err) {
+			console.error("[settings] failed to persist:", err);
+		}
 	}, [settings]);
 
 	const update = <K extends keyof Settings>(key: K, value: Settings[K]) =>

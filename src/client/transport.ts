@@ -20,6 +20,7 @@ export type ServerMsg =
 	  }
 	| { type: "tool_result"; seq: number; name: string; ok: boolean }
 	| { type: "permission_mode"; seq: number; mode: string }
+	| { type: "restart"; seq: number; agent: string }
 	| { type: "error"; seq: number; message: string; fatal?: boolean }
 	| { type: "agent_exit"; seq: number; code: number | null };
 
@@ -76,7 +77,8 @@ class Transport {
 		ws.addEventListener("message", (ev) => {
 			try {
 				const msg = JSON.parse(ev.data) as ServerMsg;
-				if (typeof msg.seq === "number" && msg.seq > this.lastSeq) {
+				if (typeof msg.seq === "number") {
+					if (msg.seq <= this.lastSeq) return;
 					this.lastSeq = msg.seq;
 				}
 				this.opts.onMessage(msg);
@@ -101,6 +103,8 @@ class Transport {
 	send(msg: ClientMsg) {
 		if (this.ws?.readyState === WebSocket.OPEN) {
 			this.ws.send(JSON.stringify(msg));
+		} else {
+			console.warn("[transport] dropping message; socket not open", msg.type);
 		}
 	}
 }

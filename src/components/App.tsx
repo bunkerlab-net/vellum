@@ -58,11 +58,11 @@ export default function App() {
 					setPermissionModeState(msg.mode);
 					break;
 				case "user_echo":
-					setEntries((es) =>
-						es.some((e) => e.type === "user" && e.text === msg.text)
-							? es
-							: [...es, { id: nextId(), type: "user", text: msg.text }],
-					);
+					setEntries((es) => {
+						const last = es[es.length - 1];
+						if (last?.type === "user" && last.text === msg.text) return es;
+						return [...es, { id: nextId(), type: "user", text: msg.text }];
+					});
 					setThinking(true);
 					break;
 				case "assistant_partial": {
@@ -100,6 +100,11 @@ export default function App() {
 				case "tool_use":
 					setThinking(true);
 					if (msg.name === "AskUserQuestion") {
+						const toolUseId = msg.toolUseId;
+						if (!toolUseId) {
+							console.warn("[app] AskUserQuestion missing toolUseId; skipping");
+							break;
+						}
 						const questions = parseAskQuestions(msg.input);
 						if (questions.length > 0) {
 							setEntries((es) => [
@@ -107,7 +112,7 @@ export default function App() {
 								{
 									id: nextId(),
 									type: "ask",
-									toolUseId: msg.toolUseId ?? "",
+									toolUseId,
 									questions,
 									answers: questions.map(() => null),
 									submitted: false,
@@ -116,6 +121,12 @@ export default function App() {
 							setThinking(false);
 						}
 					}
+					break;
+				case "restart":
+					setEntries([]);
+					partialEntryId.current = null;
+					setThinking(false);
+					setErrorBanner(null);
 					break;
 				case "tool_result":
 					if (MUTATING_TOOLS.has(msg.name)) {
@@ -214,7 +225,17 @@ export default function App() {
 			if (e.key === "Escape") {
 				e.preventDefault();
 				interrupt();
+				const partialId = partialEntryId.current;
 				partialEntryId.current = null;
+				if (partialId != null) {
+					setEntries((es) =>
+						es.map((entry) =>
+							entry.id === partialId && entry.type === "narrator"
+								? { ...entry, text: `${entry.text} _(interrupted)_` }
+								: entry,
+						),
+					);
+				}
 				setThinking(false);
 			}
 		};

@@ -207,22 +207,15 @@ export async function startServer(opts: StartOptions) {
 					const after = msg.lastSeq ?? 0;
 					for (const m of ring) if (m.seq > after) ws.send(JSON.stringify(m));
 					if (!ring.some((m) => m.type === "ready")) {
-						const readyMsg: ServerMsg = {
+						emit({
 							type: "ready",
-							seq: ++seq,
 							agent: opts.agentName,
 							permissionMode,
-						};
-						ring.push(readyMsg);
-						ws.send(JSON.stringify(readyMsg));
+						});
 					}
-					ws.send(
-						JSON.stringify({
-							type: "permission_mode",
-							seq: ++seq,
-							mode: permissionMode,
-						}),
-					);
+					if (!ring.some((m) => m.type === "permission_mode")) {
+						emit({ type: "permission_mode", mode: permissionMode });
+					}
 					return;
 				}
 
@@ -290,10 +283,12 @@ export async function startServer(opts: StartOptions) {
 
 				if (msg.type === "restart") {
 					(async () => {
+						emit({ type: "restart", agent: opts.agentName });
 						await agent?.close();
 						agent = null;
 						ring.length = 0;
-						seq = 0;
+						respawnAttempts = 0;
+						lastSessionId = undefined;
 						spawnAgent();
 					})().catch((err) => {
 						emit({
@@ -324,7 +319,9 @@ async function findFreePort(start: number, span = 20): Promise<number> {
 	for (let p = start; p < start + span; p++) {
 		if (await canBind(p)) return p;
 	}
-	return start;
+	throw new Error(
+		`No free port available in range ${start}-${start + span - 1}`,
+	);
 }
 
 async function canBind(port: number): Promise<boolean> {

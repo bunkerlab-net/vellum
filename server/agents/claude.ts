@@ -30,21 +30,32 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
 	void drainStderr(proc.stderr, spawn);
 	void watchExit(proc, spawn);
 
+	const writeFrame = (frame: unknown) => {
+		try {
+			proc.stdin.write(`${JSON.stringify(frame)}\n`);
+			proc.stdin.flush();
+		} catch (err) {
+			spawn.emit({
+				type: "error",
+				message: `failed to write to claude stdin: ${
+					err instanceof Error ? err.message : String(err)
+				}`,
+			});
+		}
+	};
+
 	return {
 		get sessionId() {
 			return sessionId;
 		},
 		async send(text: string) {
-			const frame = {
+			writeFrame({
 				type: "user",
 				message: { role: "user", content: [{ type: "text", text }] },
-			};
-			const writer = proc.stdin;
-			writer.write(`${JSON.stringify(frame)}\n`);
-			writer.flush();
+			});
 		},
 		async sendToolReply(toolUseId: string, content: string) {
-			const frame = {
+			writeFrame({
 				type: "user",
 				message: {
 					role: "user",
@@ -56,10 +67,7 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
 						},
 					],
 				},
-			};
-			const writer = proc.stdin;
-			writer.write(`${JSON.stringify(frame)}\n`);
-			writer.flush();
+			});
 		},
 		interrupt() {
 			proc.kill("SIGINT");
@@ -176,6 +184,12 @@ function handleEvent(
 			if (block.type === "text" && typeof block.text === "string") {
 				spawn.emit({ type: "assistant_text", text: block.text });
 			} else if (block.type === "tool_use" && block.name) {
+				if (!block.id) {
+					process.stderr.write(
+						`[claude] tool_use missing id for ${block.name}; dropping\n`,
+					);
+					continue;
+				}
 				spawn.emit({
 					type: "tool_use",
 					name: block.name,

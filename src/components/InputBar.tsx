@@ -40,6 +40,8 @@ export default function InputBar({ onSend, onRoll, disabled }: Props) {
 				type="button"
 				className="input-rune"
 				onClick={onRoll}
+				disabled={disabled}
+				aria-disabled={disabled}
 				title="Roll d20"
 			>
 				<Icon.D20 s={22} />

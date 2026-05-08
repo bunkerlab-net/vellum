@@ -1,6 +1,8 @@
 ## Claude Local Settings
 .claude/*.local.json
+.claude/local
 .agents/*.local.json
+.agents/local
 CLAUDE.local.md
 
 ## Campaign Data (user playthroughs are not part of the harness)

@@ -122,7 +122,10 @@ function rollDiceTerm(term: DiceTerm): DiceResult {
 	}
 
 	const ascending = rolls.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
-	const k = term.k ?? 0;
+	if (term.k == null || term.k <= 0) {
+		throw new Error(`'${term.op}' requires a positive count`);
+	}
+	const k = term.k;
 	const n = term.n;
 	let dropIdx: Set<number>;
 

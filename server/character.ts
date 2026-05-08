@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { type Dirent, existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -65,14 +65,21 @@ export async function loadCharacter(
 		`${safeCharacter}.md`,
 	);
 	if (!existsSync(sheetFile)) return null;
-	const sheetText = await Bun.file(sheetFile).text();
 
-	const stateFile = join(campaignsDir, safeCampaign, "state.md");
-	const meta = existsSync(stateFile)
-		? parseState(await Bun.file(stateFile).text())
-		: {};
-
-	return parseCharacter(safeCharacter, sheetText, safeCampaign, meta);
+	try {
+		const sheetText = await Bun.file(sheetFile).text();
+		const stateFile = join(campaignsDir, safeCampaign, "state.md");
+		const meta = existsSync(stateFile)
+			? parseState(await Bun.file(stateFile).text())
+			: {};
+		return parseCharacter(safeCharacter, sheetText, safeCampaign, meta);
+	} catch (err) {
+		console.error(
+			`[character] failed to load ${safeCampaign}/${safeCharacter}:`,
+			err,
+		);
+		return null;
+	}
 }
 
 export async function listCampaigns(projectRoot: string): Promise<
@@ -83,20 +90,32 @@ export async function listCampaigns(projectRoot: string): Promise<
 > {
 	const campaignsDir = join(projectRoot, "campaigns");
 	if (!existsSync(campaignsDir)) return [];
-	const entries = await readdir(campaignsDir, { withFileTypes: true });
+	let entries: Dirent[];
+	try {
+		entries = (await readdir(campaignsDir, {
+			withFileTypes: true,
+		})) as Dirent[];
+	} catch (err) {
+		console.error(`[character] failed to read ${campaignsDir}:`, err);
+		return [];
+	}
 	const out: { slug: string; characters: string[] }[] = [];
 	for (const dirent of entries) {
 		if (!dirent.isDirectory()) continue;
 		const slug = dirent.name;
 		const charsDir = join(campaignsDir, slug, "characters");
 		if (!existsSync(charsDir)) continue;
-		const charFiles = (await readdir(charsDir, { withFileTypes: true })).filter(
-			(f) => f.isFile() && f.name.endsWith(".md"),
-		);
-		const characters = charFiles
-			.map((f) => f.name.slice(0, -3))
-			.sort((a, b) => a.localeCompare(b));
-		out.push({ slug, characters });
+		try {
+			const charFiles = (
+				await readdir(charsDir, { withFileTypes: true })
+			).filter((f) => f.isFile() && f.name.endsWith(".md"));
+			const characters = charFiles
+				.map((f) => f.name.slice(0, -3))
+				.sort((a, b) => a.localeCompare(b));
+			out.push({ slug, characters });
+		} catch (err) {
+			console.warn(`[character] skipping unreadable campaign ${slug}:`, err);
+		}
 	}
 	return out.sort((a, b) => a.slug.localeCompare(b.slug));
 }

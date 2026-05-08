@@ -79,12 +79,12 @@ export const Fleuron = ({
 
 export const FramedPanel = ({
 	children,
-	ornaments = 1,
+	ornaments = true,
 	style = {},
 	className = "",
 }: {
 	children: ReactNode;
-	ornaments?: number;
+	ornaments?: boolean;
 	style?: CSSProperties;
 	className?: string;
 }) => (
@@ -93,7 +93,7 @@ export const FramedPanel = ({
 		style={{ position: "relative", ...style }}
 	>
 		<div className="framed-panel-inner">{children}</div>
-		{ornaments > 0 && (
+		{ornaments && (
 			<>
 				<div style={{ position: "absolute", top: -2, left: -2 }}>
 					<CornerOrnament />

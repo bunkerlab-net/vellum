@@ -62,6 +62,21 @@ function AbilityScore({
 	);
 }
 
+function ordinalSuffix(n: number): string {
+	const tens = n % 100;
+	if (tens >= 11 && tens <= 13) return `${n}th`;
+	switch (n % 10) {
+		case 1:
+			return `${n}st`;
+		case 2:
+			return `${n}nd`;
+		case 3:
+			return `${n}rd`;
+		default:
+			return `${n}th`;
+	}
+}
+
 function SectionHeader({ children }: { children: ReactNode }) {
 	return (
 		<div className="sec-hdr">
@@ -98,7 +113,12 @@ export default function CharacterPanel({ character, onRoll }: Props) {
 	const c = character;
 	const firstSlot = c.spellSlots[0];
 	const persuasion = c.skills?.persuasion;
-	const persuasionStr = persuasion >= 0 ? `+${persuasion}` : `${persuasion}`;
+	const persuasionStr =
+		typeof persuasion === "number"
+			? persuasion >= 0
+				? `+${persuasion}`
+				: `${persuasion}`
+			: "—";
 	const toHit = c.primaryAttackBonus;
 	const toHitStr = toHit >= 0 ? `+${toHit}` : `${toHit}`;
 
@@ -201,7 +221,7 @@ export default function CharacterPanel({ character, onRoll }: Props) {
 								{firstSlot.current} / {firstSlot.max}
 							</div>
 							<div className="slot-info-lbl">
-								{firstSlot.level}st-level slots · long rest
+								{ordinalSuffix(firstSlot.level)}-level slots · long rest
 							</div>
 						</div>
 					</div>

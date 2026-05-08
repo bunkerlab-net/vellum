@@ -19,6 +19,7 @@ export type ServerMsgIn =
 	| { type: "tool_use"; name: string; toolUseId?: string; input?: unknown }
 	| { type: "tool_result"; name: string; ok: boolean }
 	| { type: "permission_mode"; mode: string }
+	| { type: "restart"; agent: string }
 	| { type: "error"; message: string; fatal?: boolean }
 	| { type: "agent_exit"; code: number | null };
 
