@@ -1,7 +1,8 @@
-import { type ChangeEvent, type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Character } from "../client/character";
 import { Icon } from "./icons";
+import PortraitViewer from "./PortraitViewer";
 
 function HoverDetails({ children, details }: { children: ReactNode; details: ReactNode | null }) {
   const [show, setShow] = useState(false);
@@ -149,9 +150,6 @@ interface Props {
   onPortraitUploaded?: () => void;
 }
 
-const PORTRAIT_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
-const PORTRAIT_MAX_BYTES = 5 * 1024 * 1024;
-
 const INVENTORY_COLLAPSED_KEY = "vellum.inventoryCollapsed";
 
 function loadCollapsed(): boolean {
@@ -165,38 +163,7 @@ function loadCollapsed(): boolean {
 
 export default function CharacterPanel({ character, onPortraitUploaded }: Props) {
   const [inventoryCollapsed, setInventoryCollapsed] = useState(loadCollapsed);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (!file || !character) return;
-    if (file.size > PORTRAIT_MAX_BYTES) {
-      setUploadError(`Image too large (max ${Math.floor(PORTRAIT_MAX_BYTES / (1024 * 1024))}MB)`);
-      return;
-    }
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const url = `/api/portrait?campaign=${encodeURIComponent(character.campaign)}&character=${encodeURIComponent(character.slug)}`;
-      const r = await fetch(url, {
-        method: "POST",
-        body: file,
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-      });
-      if (!r.ok) {
-        const detail = await r.text().catch(() => "");
-        throw new Error(detail || `${r.status}`);
-      }
-      onPortraitUploaded?.();
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setUploading(false);
-    }
-  };
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const toggleInventory = () => {
     setInventoryCollapsed((prev) => {
@@ -239,7 +206,12 @@ export default function CharacterPanel({ character, onPortraitUploaded }: Props)
       <div className="char-bg-paper"></div>
 
       <div className="char-portrait-frame">
-        <div className="char-portrait">
+        <button
+          type="button"
+          className="char-portrait char-portrait-button"
+          onClick={() => setViewerOpen(true)}
+          aria-label={`Open ${c.name} portraits`}
+        >
           <img
             src={c.portrait}
             alt={c.name}
@@ -253,7 +225,7 @@ export default function CharacterPanel({ character, onPortraitUploaded }: Props)
               (e.currentTarget as HTMLImageElement).src = "/assets/portrait-default.png";
             }}
           />
-        </div>
+        </button>
         <div className="char-portrait-banner">
           <div className="char-name">{c.name}</div>
           <div className="char-sub">
@@ -270,24 +242,9 @@ export default function CharacterPanel({ character, onPortraitUploaded }: Props)
         </div>
       </div>
 
-      <div className="char-portrait-actions">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={PORTRAIT_ACCEPT}
-          onChange={onPickFile}
-          style={{ display: "none" }}
-        />
-        <button
-          type="button"
-          className="char-portrait-upload"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading ? "Uploading…" : "Change portrait"}
-        </button>
-        {uploadError && <div className="char-portrait-upload-err">{uploadError}</div>}
-      </div>
+      {viewerOpen && (
+        <PortraitViewer character={c} onClose={() => setViewerOpen(false)} onUploaded={() => onPortraitUploaded?.()} />
+      )}
 
       <div className="char-section">
         <SectionHeader>Vitals</SectionHeader>

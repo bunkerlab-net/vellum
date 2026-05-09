@@ -1107,15 +1107,171 @@ button {
   border: 1px solid rgba(201, 169, 97, 0.4);
   background: rgba(0, 0, 0, 0.5);
 }
-.char-portrait-actions {
-  margin: 0 18px 14px;
+.char-portrait-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: zoom-in;
+  position: relative;
+}
+.char-portrait-button:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: -2px;
+}
+.char-portrait-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, 0.55));
+  opacity: 0;
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+.char-portrait-button:hover::after,
+.char-portrait-button:focus-visible::after {
+  opacity: 1;
+}
+
+/* ============ PORTRAIT VIEWER ============ */
+.portrait-viewer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+}
+.portrait-viewer-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(4, 2, 0, 0.78);
+  backdrop-filter: blur(4px);
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+.portrait-viewer-dialog {
+  position: absolute;
+  inset: 5vh 4vw;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
+  background: linear-gradient(180deg, var(--bg-panel), var(--bg) 90%);
+  border: 1px solid var(--gold);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 24px 60px rgba(0, 0, 0, 0.7);
+  padding: 28px 32px;
+  outline: none;
+  overflow: hidden;
+  animation: portrait-viewer-in 140ms ease-out;
 }
-.char-portrait-upload {
-  padding: 7px 10px;
+@keyframes portrait-viewer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.portrait-viewer-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid rgba(201, 169, 97, 0.4);
+  color: var(--gold-bright);
+  font-family: var(--font-heading);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+.portrait-viewer-close:hover {
+  border-color: var(--gold-bright);
+  background: rgba(201, 169, 97, 0.1);
+}
+.portrait-viewer-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 2fr);
+  /* Single explicit row so each column has a definite height — that's what
+     lets the image's `max-height: 100%` actually clamp it to the column. */
+  grid-template-rows: 1fr;
+  gap: 24px;
+}
+@media (max-width: 800px) {
+  .portrait-viewer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.portrait-tile {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+}
+.portrait-tile-head {
+  flex-shrink: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.portrait-tile-label {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+}
+.portrait-tile-hint {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--parchment-dim);
+  font-style: italic;
+}
+/* Image and placeholder size themselves to their natural aspect, capped by
+   `max-height: calc(...)` so the head + image + button can stack tightly under
+   the heading without scrolling. The dialog is `inset: 5vh 4vw` (~90vh tall)
+   minus its 28px top/bottom padding, ~46px head, ~36px button, and gaps —
+   180px is a comfortable allowance. */
+.portrait-tile-img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(90vh - 180px);
+  border: 1px solid rgba(201, 169, 97, 0.35);
+  background: rgba(0, 0, 0, 0.55);
+}
+.portrait-tile-placeholder {
+  width: min(80%, 240px);
+  aspect-ratio: 7 / 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  border: 1px dashed rgba(201, 169, 97, 0.35);
+  background: rgba(0, 0, 0, 0.55);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--parchment-dim);
+  font-style: italic;
+}
+.portrait-tile-upload {
+  align-self: center;
+  padding: 8px 18px;
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(201, 169, 97, 0.3);
   color: var(--parchment-dim);
@@ -1129,26 +1285,28 @@ button {
     border-color 120ms ease,
     background 120ms ease;
 }
-.char-portrait-upload:hover:not(:disabled) {
+.portrait-tile-upload:hover:not(:disabled) {
   color: var(--gold-bright);
   border-color: var(--gold);
   background: rgba(201, 169, 97, 0.1);
 }
-.char-portrait-upload:focus-visible {
+.portrait-tile-upload:focus-visible {
   outline: none;
   border-color: var(--gold-bright);
   color: var(--gold-bright);
   box-shadow: 0 0 0 1px rgba(201, 169, 97, 0.45);
 }
-.char-portrait-upload:disabled {
+.portrait-tile-upload:disabled {
   cursor: progress;
   opacity: 0.6;
 }
-.char-portrait-upload-err {
+.portrait-tile-err {
+  align-self: center;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--blood);
   letter-spacing: 0.04em;
+  text-align: center;
 }
 .char-portrait-frame::before {
   content: "";

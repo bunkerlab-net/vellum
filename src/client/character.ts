@@ -41,6 +41,9 @@ export interface Character {
   carryCap: number;
   primaryAttackBonus: number;
   portrait: string;
+  bigPortrait: string;
+  hasSmallPortrait: boolean;
+  hasBigPortrait: boolean;
   campaign: string;
   location: string;
   inGameDate: string;

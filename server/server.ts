@@ -198,8 +198,12 @@ export async function startServer(opts: StartOptions) {
       if (url.pathname === "/api/portrait" && req.method === "POST") {
         const campaign = url.searchParams.get("campaign");
         const character = url.searchParams.get("character");
+        const variant = parseVariant(url.searchParams.get("variant"));
         if (!campaign || !character) {
           return new Response("missing campaign or character", { status: 400 });
+        }
+        if (!variant) {
+          return new Response("invalid variant (small|big)", { status: 400 });
         }
         const safeCampaign = campaign.replace(/[^a-z0-9_-]/gi, "");
         const safeCharacter = character.replace(/[^a-z0-9_-]/gi, "");
@@ -222,7 +226,7 @@ export async function startServer(opts: StartOptions) {
         const assetsDir = join(opts.campaignsDir, safeCampaign, "assets");
         try {
           await mkdir(assetsDir, { recursive: true });
-          const target = join(assetsDir, `${safeCharacter}-portrait.png`);
+          const target = join(assetsDir, portraitFilename(safeCharacter, variant));
           await Bun.write(target, bytes);
           return Response.json({ ok: true });
         } catch (err) {
@@ -243,7 +247,8 @@ export async function startServer(opts: StartOptions) {
       if (url.pathname.startsWith("/assets/portrait/")) {
         const slug = url.pathname.slice("/assets/portrait/".length);
         const campaignFilter = url.searchParams.get("campaign") ?? undefined;
-        const portrait = await findPortrait(opts.campaignsDir, slug, opts.distDir, campaignFilter);
+        const variant = parseVariant(url.searchParams.get("variant")) ?? "small";
+        const portrait = await findPortrait(opts.campaignsDir, slug, opts.distDir, campaignFilter, variant);
         if (portrait) return new Response(Bun.file(portrait));
         return new Response("not found", { status: 404 });
       }
@@ -428,26 +433,40 @@ async function canBind(port: number): Promise<boolean> {
   }
 }
 
+type PortraitVariant = "small" | "big";
+
+function parseVariant(raw: string | null | undefined): PortraitVariant | null {
+  if (raw == null || raw === "" || raw === "small") return "small";
+  if (raw === "big") return "big";
+  return null;
+}
+
+export function portraitFilename(slug: string, variant: PortraitVariant): string {
+  return variant === "big" ? `${slug}-big-portrait.png` : `${slug}-portrait.png`;
+}
+
 async function findPortrait(
   campaignsDir: string,
   slug: string,
   distDir: string,
-  campaignFilter?: string,
+  campaignFilter: string | undefined,
+  variant: PortraitVariant,
 ): Promise<string | null> {
   const safeSlug = slug.replace(/[^a-z0-9_-]/gi, "");
   if (!safeSlug) return null;
   const safeCampaign = campaignFilter?.replace(/[^a-z0-9_-]/gi, "") || null;
+  const filename = portraitFilename(safeSlug, variant);
 
   if (existsSync(campaignsDir)) {
     if (safeCampaign) {
-      const candidate = join(campaignsDir, safeCampaign, "assets", `${safeSlug}-portrait.png`);
+      const candidate = join(campaignsDir, safeCampaign, "assets", filename);
       if (existsSync(candidate)) return candidate;
     } else {
       const fs = await import("node:fs/promises");
       const dirs = await fs.readdir(campaignsDir, { withFileTypes: true });
       for (const d of dirs) {
         if (!d.isDirectory()) continue;
-        const candidate = join(campaignsDir, d.name, "assets", `${safeSlug}-portrait.png`);
+        const candidate = join(campaignsDir, d.name, "assets", filename);
         if (existsSync(candidate)) return candidate;
       }
     }

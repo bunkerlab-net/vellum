@@ -43,6 +43,9 @@ export interface Character {
   carryCap: number;
   primaryAttackBonus: number;
   portrait: string;
+  bigPortrait: string;
+  hasSmallPortrait: boolean;
+  hasBigPortrait: boolean;
   campaign: string;
   location: string;
   inGameDate: string;
@@ -65,9 +68,12 @@ export async function loadCharacter(
     const sheetText = await Bun.file(sheetFile).text();
     const stateFile = join(campaignsDir, safeCampaign, "state.md");
     const meta = existsSync(stateFile) ? parseState(await Bun.file(stateFile).text()) : {};
-    const portraitFile = join(campaignsDir, safeCampaign, "assets", `${safeCharacter}-portrait.png`);
-    const portraitVersion = existsSync(portraitFile) ? Math.floor(statSync(portraitFile).mtimeMs) : 0;
-    return parseCharacter(safeCharacter, sheetText, safeCampaign, meta, portraitVersion);
+    const assetsDir = join(campaignsDir, safeCampaign, "assets");
+    const smallFile = join(assetsDir, `${safeCharacter}-portrait.png`);
+    const bigFile = join(assetsDir, `${safeCharacter}-big-portrait.png`);
+    const smallVersion = existsSync(smallFile) ? Math.floor(statSync(smallFile).mtimeMs) : 0;
+    const bigVersion = existsSync(bigFile) ? Math.floor(statSync(bigFile).mtimeMs) : 0;
+    return parseCharacter(safeCharacter, sheetText, safeCampaign, meta, smallVersion, bigVersion);
   } catch (err) {
     console.error(`[character] failed to load ${safeCampaign}/${safeCharacter}:`, err);
     return null;
@@ -144,7 +150,8 @@ function parseCharacter(
   md: string,
   campaign: string,
   state: StateMeta,
-  portraitVersion: number,
+  smallVersion: number,
+  bigVersion: number,
 ): Character {
   const heading = md.match(/^#\s+(.+)$/m);
   const name = heading ? heading[1].trim() : slug;
@@ -209,7 +216,10 @@ function parseCharacter(
     totalWeight,
     carryCap,
     primaryAttackBonus,
-    portrait: `/assets/portrait/${slug}?campaign=${campaign}${portraitVersion ? `&v=${portraitVersion}` : ""}`,
+    portrait: `/assets/portrait/${slug}?campaign=${campaign}${smallVersion ? `&v=${smallVersion}` : ""}`,
+    bigPortrait: `/assets/portrait/${slug}?campaign=${campaign}&variant=big${bigVersion ? `&v=${bigVersion}` : ""}`,
+    hasSmallPortrait: smallVersion > 0,
+    hasBigPortrait: bigVersion > 0,
     campaign,
     location: state.location ?? "",
     inGameDate: state.inGameDate ?? "",
