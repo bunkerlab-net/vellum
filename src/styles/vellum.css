@@ -1107,6 +1107,49 @@ button {
   border: 1px solid rgba(201, 169, 97, 0.4);
   background: rgba(0, 0, 0, 0.5);
 }
+.char-portrait-actions {
+  margin: 0 18px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.char-portrait-upload {
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  color: var(--parchment-dim);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+.char-portrait-upload:hover:not(:disabled) {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  background: rgba(201, 169, 97, 0.1);
+}
+.char-portrait-upload:focus-visible {
+  outline: none;
+  border-color: var(--gold-bright);
+  color: var(--gold-bright);
+  box-shadow: 0 0 0 1px rgba(201, 169, 97, 0.45);
+}
+.char-portrait-upload:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+.char-portrait-upload-err {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--blood);
+  letter-spacing: 0.04em;
+}
 .char-portrait-frame::before {
   content: "";
   position: absolute;

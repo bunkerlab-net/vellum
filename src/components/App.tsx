@@ -387,7 +387,9 @@ export default function App() {
           )}
         </section>
 
-        {hasSelection && <CharacterPanel character={character} />}
+        {hasSelection && (
+          <CharacterPanel character={character} onPortraitUploaded={() => setCharacterRefresh((n) => n + 1)} />
+        )}
       </main>
 
       <SettingsMenu

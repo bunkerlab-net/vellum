@@ -1,4 +1,5 @@
 import { existsSync, statSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 import type { Agent, ClientMsg, ServerMsg, ServerMsgIn } from "./agents/index";
@@ -9,9 +10,33 @@ export type PermissionMode = "default" | "acceptEdits";
 const PERMISSION_MODES: PermissionMode[] = ["default", "acceptEdits"];
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh"] as const;
 type Effort = (typeof EFFORT_LEVELS)[number];
+const MAX_PORTRAIT_BYTES = 5 * 1024 * 1024;
 
 function isEffort(v: string): v is Effort {
   return (EFFORT_LEVELS as readonly string[]).includes(v);
+}
+
+function isImageMagic(head: Uint8Array): boolean {
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (head.length >= 8 && head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) return true;
+  // JPEG: FF D8 FF
+  if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return true;
+  // GIF: 47 49 46 38
+  if (head.length >= 4 && head[0] === 0x47 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x38) return true;
+  // WebP: 52 49 46 46 ?? ?? ?? ?? 57 45 42 50
+  if (
+    head.length >= 12 &&
+    head[0] === 0x52 &&
+    head[1] === 0x49 &&
+    head[2] === 0x46 &&
+    head[3] === 0x46 &&
+    head[8] === 0x57 &&
+    head[9] === 0x45 &&
+    head[10] === 0x42 &&
+    head[11] === 0x50
+  )
+    return true;
+  return false;
 }
 
 const MIME: Record<string, string> = {
@@ -168,6 +193,41 @@ export async function startServer(opts: StartOptions) {
 
       if (url.pathname === "/api/permission-mode") {
         return Response.json({ mode: permissionMode });
+      }
+
+      if (url.pathname === "/api/portrait" && req.method === "POST") {
+        const campaign = url.searchParams.get("campaign");
+        const character = url.searchParams.get("character");
+        if (!campaign || !character) {
+          return new Response("missing campaign or character", { status: 400 });
+        }
+        const safeCampaign = campaign.replace(/[^a-z0-9_-]/gi, "");
+        const safeCharacter = character.replace(/[^a-z0-9_-]/gi, "");
+        if (!safeCampaign || !safeCharacter) {
+          return new Response("invalid slug", { status: 400 });
+        }
+        const sheetFile = join(opts.campaignsDir, safeCampaign, "characters", `${safeCharacter}.md`);
+        if (!existsSync(sheetFile)) {
+          return new Response("character not found", { status: 404 });
+        }
+        const bytes = await req.arrayBuffer();
+        if (bytes.byteLength === 0) return new Response("empty body", { status: 400 });
+        if (bytes.byteLength > MAX_PORTRAIT_BYTES) {
+          return new Response(`too large (max ${MAX_PORTRAIT_BYTES} bytes)`, { status: 413 });
+        }
+        const head = new Uint8Array(bytes, 0, Math.min(16, bytes.byteLength));
+        if (!isImageMagic(head)) {
+          return new Response("unsupported image format (PNG/JPEG/GIF/WebP)", { status: 415 });
+        }
+        const assetsDir = join(opts.campaignsDir, safeCampaign, "assets");
+        try {
+          await mkdir(assetsDir, { recursive: true });
+          const target = join(assetsDir, `${safeCharacter}-portrait.png`);
+          await Bun.write(target, bytes);
+          return Response.json({ ok: true });
+        } catch (err) {
+          return new Response(`save failed: ${errorMessage(err)}`, { status: 500 });
+        }
       }
 
       if (url.pathname === "/api/models") {

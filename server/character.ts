@@ -1,4 +1,4 @@
-import { type Dirent, existsSync } from "node:fs";
+import { type Dirent, existsSync, statSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -65,7 +65,9 @@ export async function loadCharacter(
     const sheetText = await Bun.file(sheetFile).text();
     const stateFile = join(campaignsDir, safeCampaign, "state.md");
     const meta = existsSync(stateFile) ? parseState(await Bun.file(stateFile).text()) : {};
-    return parseCharacter(safeCharacter, sheetText, safeCampaign, meta);
+    const portraitFile = join(campaignsDir, safeCampaign, "assets", `${safeCharacter}-portrait.png`);
+    const portraitVersion = existsSync(portraitFile) ? Math.floor(statSync(portraitFile).mtimeMs) : 0;
+    return parseCharacter(safeCharacter, sheetText, safeCampaign, meta, portraitVersion);
   } catch (err) {
     console.error(`[character] failed to load ${safeCampaign}/${safeCharacter}:`, err);
     return null;
@@ -137,7 +139,13 @@ function parseState(md: string): StateMeta {
   return meta;
 }
 
-function parseCharacter(slug: string, md: string, campaign: string, state: StateMeta): Character {
+function parseCharacter(
+  slug: string,
+  md: string,
+  campaign: string,
+  state: StateMeta,
+  portraitVersion: number,
+): Character {
   const heading = md.match(/^#\s+(.+)$/m);
   const name = heading ? heading[1].trim() : slug;
 
@@ -201,7 +209,7 @@ function parseCharacter(slug: string, md: string, campaign: string, state: State
     totalWeight,
     carryCap,
     primaryAttackBonus,
-    portrait: `/assets/portrait/${slug}?campaign=${campaign}`,
+    portrait: `/assets/portrait/${slug}?campaign=${campaign}${portraitVersion ? `&v=${portraitVersion}` : ""}`,
     campaign,
     location: state.location ?? "",
     inGameDate: state.inGameDate ?? "",
