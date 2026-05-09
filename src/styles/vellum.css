@@ -514,9 +514,10 @@ button {
   }
 }
 
-/* Illuminated drop-cap. Wrapped via the markdown `p` override so the leading
-   token (letter or multi-digit number) is one styled span. */
-.drop-cap {
+/* Illuminated drop-cap. Pure CSS via `::first-letter` on the first paragraph
+   of an Illuminated narrator block — no DOM manipulation, so the cap is
+   stable through streaming re-renders and React 19 concurrent commits. */
+.narrator-block.illuminated.has-drop-cap .narrator-text > p:first-of-type::first-letter {
   font-family: var(--font-heading);
   font-size: 56px;
   line-height: 0.85;

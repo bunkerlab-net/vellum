@@ -7,8 +7,7 @@
     "astro": "astro",
     "build": "bun install && astro build",
     "clean": "rm -rf dist node_modules .astro .vite *.tsbuildinfo",
-    "dev": "bun install && bun run server/cli.ts --dev",
-    "start": "bun install && bun run server/cli.ts"
+    "start": "bun run build && bun run server/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.132",

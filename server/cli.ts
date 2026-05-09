@@ -14,7 +14,7 @@ let agentName: string | null = null;
 
 for (let i = 0; i < raw.length; i++) {
   const arg = raw[i];
-  if (arg === "--dev" || arg === "--no-build" || arg === "--no-open") {
+  if (arg === "--no-build" || arg === "--no-open") {
     flags.add(arg);
     continue;
   }

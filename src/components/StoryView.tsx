@@ -1,25 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Icon } from "./icons";
-
-const LEADING_DROP_CAP = /^(\d+|[A-Za-z])(.*)/s;
-
-function injectDropCap(children: React.ReactNode): React.ReactNode {
-  const arr = Array.isArray(children) ? children : [children];
-  const first = arr[0];
-  if (typeof first !== "string" || first.length === 0) return children;
-  const match = first.match(LEADING_DROP_CAP);
-  if (!match) return children;
-  const [, head, rest] = match;
-  return [
-    <span key="drop-cap" className="drop-cap">
-      {head}
-    </span>,
-    rest,
-    ...arr.slice(1),
-  ];
-}
 
 export type RevealMode = "typewriter" | "illuminated" | "instant";
 
@@ -97,30 +79,6 @@ function StoryEntry({ entry, revealMode, isLatest, playerName, onChoose, onAsk, 
   const dropCap =
     entry.type === "narrator" && revealMode === "illuminated" && entry.dropCap !== false && !entry.speaker;
   const textRef = useRef<HTMLDivElement>(null);
-
-  // Reset the drop-cap "already injected" flag when the rendered text or
-  // dropCap toggle changes. We use a ref so the components callback below
-  // observes the latest value, but we still memoize `components` itself so
-  // ReactMarkdown does not rebuild its DOM tree on every parent re-render
-  // (rebuilds remount paragraphs and replay the Illuminated fade-in).
-  const dropCapInjectedRef = useRef(false);
-  const dropCapResetRef = useRef<{ text: string; dropCap: boolean }>({ text: "", dropCap: false });
-  if (dropCapResetRef.current.text !== narratorText || dropCapResetRef.current.dropCap !== dropCap) {
-    dropCapResetRef.current = { text: narratorText, dropCap };
-    dropCapInjectedRef.current = false;
-  }
-  const components: Components = useMemo(() => {
-    if (!dropCap) return {};
-    return {
-      p: ({ children, ...props }) => {
-        if (dropCapInjectedRef.current) return <p {...props}>{children}</p>;
-        const next = injectDropCap(children);
-        if (next === children) return <p {...props}>{children}</p>;
-        dropCapInjectedRef.current = true;
-        return <p {...props}>{next}</p>;
-      },
-    };
-  }, [dropCap]);
 
   const animatedCountRef = useRef(0);
   const prevRevealMode = useRef(revealMode);
@@ -353,7 +311,7 @@ function StoryEntry({ entry, revealMode, isLatest, playerName, onChoose, onAsk, 
         </div>
       )}
       <div ref={textRef} className={`narrator-text ${revealed ? "revealed" : "hidden-reveal"}`}>
-        <ReactMarkdown key={revealMode} remarkPlugins={[remarkGfm]} components={components}>
+        <ReactMarkdown key={revealMode} remarkPlugins={[remarkGfm]}>
           {narratorText}
         </ReactMarkdown>
       </div>
