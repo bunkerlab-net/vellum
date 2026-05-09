@@ -1,176 +1,189 @@
-import type { Agent, AgentSpawn } from "./types";
+import {
+  createSdkMcpServer,
+  type Query,
+  query,
+  type SDKMessage,
+  type SDKUserMessage,
+  tool,
+} from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+import type { Agent, AgentSpawn, EmitFn } from "./types";
+
+type PermissionMode = "default" | "acceptEdits";
+
+interface ParsedClaudeArgs {
+  permissionMode?: PermissionMode;
+  resume?: string;
+}
+
+function parseClaudeArgs(argv: string[]): ParsedClaudeArgs {
+  const out: ParsedClaudeArgs = {};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--permission-mode" && i + 1 < argv.length) {
+      const v = argv[++i];
+      if (v === "acceptEdits" || v === "default") out.permissionMode = v;
+      continue;
+    }
+    if (a.startsWith("--permission-mode=")) {
+      const v = a.slice("--permission-mode=".length);
+      if (v === "acceptEdits" || v === "default") out.permissionMode = v;
+      continue;
+    }
+    if ((a === "--resume" || a === "-r") && i + 1 < argv.length && !argv[i + 1].startsWith("-")) {
+      out.resume = argv[++i];
+    }
+  }
+  return out;
+}
+
+const ASK_SYSTEM_PROMPT = [
+  "When you would normally use the AskUserQuestion tool to pose curated multi-choice",
+  "questions to the player, instead call `mcp__vellum__ask`. The host frontend renders",
+  "those calls as a themed picker UI; the player's selection comes back as the tool",
+  "result text. The built-in AskUserQuestion tool is disabled in this session — only",
+  "use `mcp__vellum__ask` for shortlists.",
+].join(" ");
 
 export function claudeAgent(spawn: AgentSpawn): Agent {
-  const cmd = [
-    "claude",
-    "--print",
-    "--output-format",
-    "stream-json",
-    "--input-format",
-    "stream-json",
-    "--include-partial-messages",
-    "--replay-user-messages",
-    "--verbose",
-    ...spawn.argv,
-  ];
-
   let sessionId: string | undefined;
+  let closing = false;
+  const pending = new Map<string, (answer: string) => void>();
+  const inbox = createInbox<SDKUserMessage>();
+  const abort = new AbortController();
+  const opts = parseClaudeArgs(spawn.argv);
 
-  const proc = Bun.spawn({
-    cmd,
-    cwd: spawn.cwd,
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
+  const askTool = tool(
+    "ask",
+    "Pose a curated multi-choice question (or batch of questions) to the player. Use for any pick-from-N shortlist — level-up choices, encounter parameters, in-fiction picks. Each question may set its own multiSelect flag.",
+    {
+      questions: z.array(
+        z.object({
+          question: z.string(),
+          header: z.string().optional(),
+          multiSelect: z.boolean().optional(),
+          options: z.array(
+            z.object({
+              label: z.string(),
+              description: z.string().optional(),
+            }),
+          ),
+        }),
+      ),
+    },
+    async (args) => {
+      const toolUseId = crypto.randomUUID();
+      const answer = await new Promise<string>((resolve) => {
+        pending.set(toolUseId, resolve);
+        spawn.emit({
+          type: "tool_use",
+          name: "AskUserQuestion",
+          toolUseId,
+          input: args,
+        });
+      });
+      return { content: [{ type: "text", text: answer }] };
+    },
+  );
+
+  const mcp = createSdkMcpServer({
+    name: "vellum",
+    tools: [askTool],
   });
 
-  void readEvents(proc.stdout, (raw) => handleEvent(raw, spawn, (id) => (sessionId = id)));
-  void drainStderr(proc.stderr, spawn);
-  void watchExit(proc, spawn);
+  const q: Query = query({
+    prompt: inbox.iterable,
+    options: {
+      cwd: spawn.cwd,
+      abortController: abort,
+      includePartialMessages: true,
+      mcpServers: { vellum: mcp },
+      disallowedTools: ["AskUserQuestion"],
+      systemPrompt: { type: "preset", preset: "claude_code", append: ASK_SYSTEM_PROMPT },
+      permissionMode: opts.permissionMode,
+      resume: opts.resume,
+    },
+  });
 
-  const writeFrame = (frame: unknown) => {
-    try {
-      proc.stdin.write(`${JSON.stringify(frame)}\n`);
-      proc.stdin.flush();
-    } catch (err) {
-      spawn.emit({
-        type: "error",
-        message: `failed to write to claude stdin: ${err instanceof Error ? err.message : String(err)}`,
-      });
-    }
-  };
+  void consume(
+    q,
+    spawn,
+    (id) => (sessionId = id),
+    () => closing,
+  );
 
   return {
     get sessionId() {
       return sessionId;
     },
     async send(text: string) {
-      writeFrame({
+      inbox.push({
         type: "user",
         message: { role: "user", content: [{ type: "text", text }] },
+        parent_tool_use_id: null,
       });
     },
     async sendToolReply(toolUseId: string, content: string) {
-      writeFrame({
-        type: "user",
-        message: {
-          role: "user",
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: toolUseId,
-              content,
-            },
-          ],
-        },
-      });
+      const resolve = pending.get(toolUseId);
+      if (!resolve) {
+        process.stderr.write(`[claude] no pending ask for toolUseId=${toolUseId}\n`);
+        return;
+      }
+      pending.delete(toolUseId);
+      resolve(content);
     },
     interrupt() {
-      proc.kill("SIGINT");
+      void q.interrupt().catch((err) => {
+        process.stderr.write(`[claude] interrupt failed: ${errMsg(err)}\n`);
+      });
     },
     async close() {
-      try {
-        proc.stdin.end();
-      } catch {}
-      proc.kill();
-      await proc.exited;
+      closing = true;
+      for (const [id, resolve] of pending) {
+        pending.delete(id);
+        resolve("[interrupted]");
+      }
+      inbox.close();
+      abort.abort();
     },
   };
 }
 
-async function readEvents(stream: ReadableStream<Uint8Array>, onLine: (line: string) => void) {
-  const decoder = new TextDecoder();
-  let buf = "";
-  for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) {
-    buf += decoder.decode(chunk, { stream: true });
-    let idx = buf.indexOf("\n");
-    while (idx >= 0) {
-      const line = buf.slice(0, idx).trim();
-      buf = buf.slice(idx + 1);
-      if (line) onLine(line);
-      idx = buf.indexOf("\n");
-    }
-  }
-  buf += decoder.decode();
-  if (buf.trim()) onLine(buf.trim());
-}
-
-async function drainStderr(stream: ReadableStream<Uint8Array>, spawn: AgentSpawn) {
-  const decoder = new TextDecoder();
-  for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) {
-    const text = decoder.decode(chunk, { stream: true });
-    if (text.trim()) process.stderr.write(`[claude] ${text}`);
-    void spawn;
-  }
-  const tail = decoder.decode();
-  if (tail.trim()) process.stderr.write(`[claude] ${tail}`);
-}
-
-async function watchExit(proc: ReturnType<typeof Bun.spawn>, spawn: AgentSpawn) {
-  const code = await proc.exited;
-  spawn.emit({ type: "agent_exit", code });
-}
-
-interface ClaudeEvent {
-  type?: string;
-  subtype?: string;
-  session_id?: string;
-  event?: {
-    type?: string;
-    delta?: { type?: string; text?: string };
-  };
-  message?: {
-    content?: Array<{
-      type?: string;
-      text?: string;
-      id?: string;
-      name?: string;
-      input?: unknown;
-      tool_use_id?: string;
-      tool_use_name?: string;
-      is_error?: boolean;
-    }>;
-  };
-  is_error?: boolean;
-  result?: unknown;
-}
-
-function handleEvent(line: string, spawn: AgentSpawn, captureSession: (id: string) => void) {
-  let evt: ClaudeEvent;
+async function consume(q: Query, spawn: AgentSpawn, captureSession: (id: string) => void, isClosing: () => boolean) {
   try {
-    evt = JSON.parse(line) as ClaudeEvent;
-  } catch {
+    for await (const msg of q) {
+      handleSdkMessage(msg, spawn.emit, captureSession);
+    }
+    if (!isClosing()) spawn.emit({ type: "agent_exit", code: 0 });
+  } catch (err) {
+    if (isClosing()) return;
+    spawn.emit({ type: "error", message: errMsg(err), fatal: true });
+    spawn.emit({ type: "agent_exit", code: null });
+  }
+}
+
+function handleSdkMessage(msg: SDKMessage, emit: EmitFn, captureSession: (id: string) => void) {
+  if (msg.type === "system" && msg.subtype === "init") {
+    captureSession(msg.session_id);
+    emit({ type: "ready", agent: "claude", sessionId: msg.session_id });
     return;
   }
-
-  if (evt.type === "system" && evt.subtype === "init") {
-    if (evt.session_id) captureSession(evt.session_id);
-    spawn.emit({
-      type: "ready",
-      agent: "claude",
-      sessionId: evt.session_id,
-    });
-    return;
-  }
-
-  if (evt.type === "stream_event" && evt.event) {
-    const e = evt.event;
-    if (e.type === "content_block_delta" && e.delta?.type === "text_delta" && e.delta.text) {
-      spawn.emit({ type: "assistant_partial", text: e.delta.text });
+  if (msg.type === "stream_event") {
+    const ev = msg.event;
+    if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") {
+      emit({ type: "assistant_partial", text: ev.delta.text });
     }
     return;
   }
-
-  if (evt.type === "assistant" && evt.message?.content) {
-    for (const block of evt.message.content) {
-      if (block.type === "text" && typeof block.text === "string") {
-        spawn.emit({ type: "assistant_text", text: block.text });
-      } else if (block.type === "tool_use" && block.name) {
-        if (!block.id) {
-          process.stderr.write(`[claude] tool_use missing id for ${block.name}; dropping\n`);
-          continue;
-        }
-        spawn.emit({
+  if (msg.type === "assistant") {
+    for (const block of msg.message.content) {
+      if (block.type === "text") {
+        emit({ type: "assistant_text", text: block.text });
+      } else if (block.type === "tool_use") {
+        // The MCP ask tool is surfaced from inside its handler with the
+        // canonical "AskUserQuestion" name; skip the raw pre-call event.
+        if (block.name === "mcp__vellum__ask") continue;
+        emit({
           type: "tool_use",
           name: block.name,
           toolUseId: block.id,
@@ -180,21 +193,72 @@ function handleEvent(line: string, spawn: AgentSpawn, captureSession: (id: strin
     }
     return;
   }
-
-  if (evt.type === "user" && evt.message?.content) {
-    for (const block of evt.message.content) {
+  if (msg.type === "user") {
+    const content = msg.message.content;
+    if (typeof content === "string") return;
+    for (const block of content) {
       if (block.type === "tool_result") {
-        spawn.emit({
-          type: "tool_result",
-          name: block.tool_use_name ?? "tool",
-          ok: !block.is_error,
-        });
+        emit({ type: "tool_result", name: "tool", ok: !block.is_error });
       }
     }
     return;
   }
-
-  if (evt.type === "result" && evt.is_error) {
-    spawn.emit({ type: "error", message: String(evt.result ?? "agent error") });
+  if (msg.type === "result" && msg.is_error) {
+    emit({
+      type: "error",
+      message: msg.subtype === "success" ? "agent error" : msg.subtype,
+    });
   }
+}
+
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+interface Inbox<T> {
+  iterable: AsyncIterable<T>;
+  push(item: T): void;
+  close(): void;
+}
+
+function createInbox<T>(): Inbox<T> {
+  const queue: T[] = [];
+  let resolver: ((value: IteratorResult<T>) => void) | null = null;
+  let closed = false;
+
+  const iterable: AsyncIterable<T> = {
+    [Symbol.asyncIterator]() {
+      return {
+        next(): Promise<IteratorResult<T>> {
+          const head = queue.shift();
+          if (head !== undefined) return Promise.resolve({ value: head, done: false });
+          if (closed) return Promise.resolve({ value: undefined as never, done: true });
+          return new Promise<IteratorResult<T>>((r) => {
+            resolver = r;
+          });
+        },
+      };
+    },
+  };
+
+  return {
+    iterable,
+    push(item: T) {
+      if (resolver) {
+        const r = resolver;
+        resolver = null;
+        r({ value: item, done: false });
+        return;
+      }
+      queue.push(item);
+    },
+    close() {
+      closed = true;
+      if (resolver) {
+        const r = resolver;
+        resolver = null;
+        r({ value: undefined as never, done: true });
+      }
+    },
+  };
 }
