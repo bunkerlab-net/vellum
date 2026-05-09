@@ -7,6 +7,8 @@ export type ServerMsg =
       agent: string;
       sessionId?: string;
       permissionMode?: string;
+      model?: string;
+      effort?: string;
     }
   | { type: "user_echo"; seq: number; text: string }
   | { type: "assistant_partial"; seq: number; text: string }
@@ -20,6 +22,8 @@ export type ServerMsg =
     }
   | { type: "tool_result"; seq: number; name: string; ok: boolean }
   | { type: "permission_mode"; seq: number; mode: string }
+  | { type: "model"; seq: number; model: string }
+  | { type: "effort"; seq: number; effort: string }
   | { type: "restart"; seq: number; agent: string }
   | { type: "error"; seq: number; message: string; fatal?: boolean }
   | { type: "agent_exit"; seq: number; code: number | null };
@@ -29,6 +33,8 @@ export type ClientMsg =
   | { type: "user_input"; text: string }
   | { type: "tool_reply"; toolUseId: string; content: string }
   | { type: "set_permission_mode"; mode: string }
+  | { type: "set_model"; model: string }
+  | { type: "set_effort"; effort: string }
   | { type: "interrupt" }
   | { type: "restart" };
 
@@ -129,6 +135,8 @@ export function useTransport(onMessage: (msg: ServerMsg) => void) {
   const sendToolReply = (toolUseId: string, content: string) =>
     transportRef.current?.send({ type: "tool_reply", toolUseId, content });
   const setPermissionMode = (mode: string) => transportRef.current?.send({ type: "set_permission_mode", mode });
+  const setModel = (model: string) => transportRef.current?.send({ type: "set_model", model });
+  const setEffort = (effort: string) => transportRef.current?.send({ type: "set_effort", effort });
   const interrupt = () => transportRef.current?.send({ type: "interrupt" });
   const restart = () => transportRef.current?.send({ type: "restart" });
 
@@ -137,6 +145,8 @@ export function useTransport(onMessage: (msg: ServerMsg) => void) {
     send,
     sendToolReply,
     setPermissionMode,
+    setModel,
+    setEffort,
     interrupt,
     restart,
   } as const;

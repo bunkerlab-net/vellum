@@ -10,39 +10,15 @@ import { z } from "zod";
 import type { Agent, AgentSpawn, EmitFn } from "./types";
 
 type PermissionMode = "default" | "acceptEdits";
+type EffortLevel = "low" | "medium" | "high" | "xhigh";
+const EFFORT_LEVELS: ReadonlyArray<EffortLevel> = ["low", "medium", "high", "xhigh"];
 
-interface ParsedClaudeArgs {
-  permissionMode?: PermissionMode;
-  resume?: string;
+function isPermissionMode(v: unknown): v is PermissionMode {
+  return v === "default" || v === "acceptEdits";
 }
 
-function parseClaudeArgs(argv: string[]): ParsedClaudeArgs {
-  const out: ParsedClaudeArgs = {};
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--permission-mode" && i + 1 < argv.length) {
-      const v = argv[++i];
-      if (v === "acceptEdits" || v === "default") out.permissionMode = v;
-      continue;
-    }
-    if (a.startsWith("--permission-mode=")) {
-      const v = a.slice("--permission-mode=".length);
-      if (v === "acceptEdits" || v === "default") out.permissionMode = v;
-      continue;
-    }
-    if (a.startsWith("--resume=")) {
-      out.resume = a.slice("--resume=".length);
-      continue;
-    }
-    if (a.startsWith("-r=")) {
-      out.resume = a.slice("-r=".length);
-      continue;
-    }
-    if ((a === "--resume" || a === "-r") && i + 1 < argv.length && !argv[i + 1].startsWith("-")) {
-      out.resume = argv[++i];
-    }
-  }
-  return out;
+function isEffort(v: unknown): v is EffortLevel {
+  return typeof v === "string" && (EFFORT_LEVELS as readonly string[]).includes(v);
 }
 
 const ASK_SYSTEM_PROMPT = [
@@ -59,7 +35,9 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
   const pending = new Map<string, (answer: string) => void>();
   const inbox = createInbox<SDKUserMessage>();
   const abort = new AbortController();
-  const opts = parseClaudeArgs(spawn.argv);
+  const initialPermission = isPermissionMode(spawn.permissionMode) ? spawn.permissionMode : undefined;
+  const initialEffort = isEffort(spawn.effort) ? spawn.effort : undefined;
+  const initialModel = spawn.model && spawn.model.length > 0 ? spawn.model : undefined;
 
   const askTool = tool(
     "ask",
@@ -111,8 +89,10 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
       allowedTools: ["mcp__vellum__ask"],
       disallowedTools: ["AskUserQuestion"],
       systemPrompt: { type: "preset", preset: "claude_code", append: ASK_SYSTEM_PROMPT },
-      permissionMode: opts.permissionMode,
-      resume: opts.resume,
+      permissionMode: initialPermission,
+      model: initialModel,
+      effort: initialEffort,
+      resume: spawn.resume,
     },
   });
 
@@ -142,6 +122,29 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
       }
       pending.delete(toolUseId);
       resolve(content);
+    },
+    async setModel(model: string) {
+      await q.setModel(model.length > 0 ? model : undefined).catch((err) => {
+        process.stderr.write(`[claude] setModel failed: ${errMsg(err)}\n`);
+      });
+    },
+    async setEffort(effort: string) {
+      if (!isEffort(effort)) {
+        process.stderr.write(`[claude] ignoring unknown effort: ${effort}\n`);
+        return;
+      }
+      await q.applyFlagSettings({ effortLevel: effort }).catch((err) => {
+        process.stderr.write(`[claude] setEffort failed: ${errMsg(err)}\n`);
+      });
+    },
+    async setPermissionMode(mode: string) {
+      if (!isPermissionMode(mode)) {
+        process.stderr.write(`[claude] ignoring unknown permission mode: ${mode}\n`);
+        return;
+      }
+      await q.setPermissionMode(mode).catch((err) => {
+        process.stderr.write(`[claude] setPermissionMode failed: ${errMsg(err)}\n`);
+      });
     },
     interrupt() {
       void q.interrupt().catch((err) => {

@@ -7,33 +7,12 @@ import { listCampaigns, loadCharacter } from "./character";
 
 export type PermissionMode = "default" | "acceptEdits";
 const PERMISSION_MODES: PermissionMode[] = ["default", "acceptEdits"];
+const EFFORT_LEVELS = ["low", "medium", "high", "xhigh"] as const;
+type Effort = (typeof EFFORT_LEVELS)[number];
+const KNOWN_MODELS = new Set(["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]);
 
-function permissionFlags(mode: PermissionMode, raw: string[]): string[] {
-  // Strip any caller-supplied --permission-mode (space- or equals-form) and append our own
-  const out: string[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    if (raw[i] === "--permission-mode") {
-      i++; // skip following value token
-      continue;
-    }
-    if (raw[i].startsWith("--permission-mode=")) continue;
-    out.push(raw[i]);
-  }
-  out.push("--permission-mode", mode);
-  return out;
-}
-
-function resumeFlags(raw: string[], sessionId: string): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    if (raw[i] === "--resume" || raw[i] === "-r") {
-      if (i + 1 < raw.length && !raw[i + 1].startsWith("-")) i++;
-      continue;
-    }
-    out.push(raw[i]);
-  }
-  out.push("--resume", sessionId);
-  return out;
+function isEffort(v: string): v is Effort {
+  return (EFFORT_LEVELS as readonly string[]).includes(v);
 }
 
 const MIME: Record<string, string> = {
@@ -69,6 +48,8 @@ export async function startServer(opts: StartOptions) {
   let seq = 0;
   let agent: Agent | null = null;
   let permissionMode: PermissionMode = "default";
+  let model = "";
+  let effort: Effort | "" = "";
   let lastSessionId: string | undefined;
   let interruptArmed = false;
   let respawnAttempts = 0;
@@ -117,13 +98,16 @@ export async function startServer(opts: StartOptions) {
 
   const spawnAgent = (resumeId?: string) => {
     const factory = opts.agentName in agents ? agents[opts.agentName as keyof typeof agents] : agents.claude;
-    let argv = opts.agentArgv;
-    if (opts.agentName === "claude") {
-      argv = permissionFlags(permissionMode, argv);
-      if (resumeId) argv = resumeFlags(argv, resumeId);
-    }
     try {
-      agent = factory({ cwd: opts.cwd, argv, emit: onAgentEvent });
+      agent = factory({
+        cwd: opts.cwd,
+        argv: opts.agentArgv,
+        emit: onAgentEvent,
+        permissionMode,
+        model: model || undefined,
+        effort: effort || undefined,
+        resume: resumeId,
+      });
     } catch (err) {
       emit({
         type: "error",
@@ -211,10 +195,18 @@ export async function startServer(opts: StartOptions) {
               type: "ready",
               agent: opts.agentName,
               permissionMode,
+              model,
+              effort,
             });
           }
           if (!ring.some((m) => m.type === "permission_mode")) {
             sendOnly(ws, { type: "permission_mode", mode: permissionMode });
+          }
+          if (!ring.some((m) => m.type === "model")) {
+            sendOnly(ws, { type: "model", model });
+          }
+          if (!ring.some((m) => m.type === "effort")) {
+            sendOnly(ws, { type: "effort", effort });
           }
           return;
         }
@@ -249,25 +241,54 @@ export async function startServer(opts: StartOptions) {
 
         if (msg.type === "set_permission_mode") {
           if (!PERMISSION_MODES.includes(msg.mode as PermissionMode)) {
-            emit({
-              type: "error",
-              message: `unknown permission mode: ${msg.mode}`,
-            });
+            emit({ type: "error", message: `unknown permission mode: ${msg.mode}` });
             return;
           }
           if (msg.mode === permissionMode) return;
           permissionMode = msg.mode as PermissionMode;
           emit({ type: "permission_mode", mode: permissionMode });
-          (async () => {
-            await agent?.close();
-            agent = null;
-            spawnAgent();
-          })().catch((err) => {
-            emit({
-              type: "error",
-              message: `permission-mode change failed: ${errorMessage(err)}`,
+          if (agent?.setPermissionMode) {
+            agent.setPermissionMode(permissionMode).catch((err) => {
+              emit({
+                type: "error",
+                message: `permission-mode change failed: ${errorMessage(err)}`,
+              });
             });
-          });
+          }
+          return;
+        }
+
+        if (msg.type === "set_model") {
+          const next = typeof msg.model === "string" ? msg.model : "";
+          if (next.length > 0 && !KNOWN_MODELS.has(next)) {
+            emit({ type: "error", message: `unknown model: ${next}` });
+            return;
+          }
+          if (next === model) return;
+          model = next;
+          emit({ type: "model", model });
+          if (agent?.setModel) {
+            agent.setModel(model).catch((err) => {
+              emit({ type: "error", message: `model change failed: ${errorMessage(err)}` });
+            });
+          }
+          return;
+        }
+
+        if (msg.type === "set_effort") {
+          const next = typeof msg.effort === "string" ? msg.effort : "";
+          if (next.length > 0 && !isEffort(next)) {
+            emit({ type: "error", message: `unknown effort: ${next}` });
+            return;
+          }
+          if (next === effort) return;
+          effort = next as Effort | "";
+          emit({ type: "effort", effort });
+          if (agent?.setEffort && next.length > 0) {
+            agent.setEffort(next).catch((err) => {
+              emit({ type: "error", message: `effort change failed: ${errorMessage(err)}` });
+            });
+          }
           return;
         }
 

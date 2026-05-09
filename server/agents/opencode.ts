@@ -1,122 +1,169 @@
+import { createOpencodeClient, createOpencodeServer, type Event, type Part } from "@opencode-ai/sdk";
 import type { Agent, AgentSpawn } from "./types";
+
+type OpencodeServer = Awaited<ReturnType<typeof createOpencodeServer>>;
+type OpencodeClient = ReturnType<typeof createOpencodeClient>;
 
 export function opencodeAgent(spawn: AgentSpawn): Agent {
   let sessionId: string | undefined;
-  let activeProc: ReturnType<typeof Bun.spawn> | null = null;
+  let server: OpencodeServer | undefined;
+  let client: OpencodeClient | undefined;
+  let closing = false;
+  const eventAbort = new AbortController();
+  const seenTool = new Map<string, "started" | "done">();
+  const seenTextEnd = new Set<string>();
   let queued: Promise<void> = Promise.resolve();
 
-  spawn.emit({ type: "ready", agent: "opencode" });
+  const ready = boot();
 
   return {
     get sessionId() {
       return sessionId;
     },
     async send(text: string) {
-      const p = queued.then(() => runOnce(text));
-      queued = p.catch(() => {});
-      await p;
+      const next = queued.then(() => runOnce(text));
+      queued = next.catch(() => {});
+      await next;
     },
     interrupt() {
-      activeProc?.kill("SIGINT");
+      if (!client || !sessionId) return;
+      void client.session
+        .abort({ path: { id: sessionId } })
+        .catch((err) => process.stderr.write(`[opencode] abort failed: ${errMsg(err)}\n`));
     },
     async close() {
-      activeProc?.kill();
-      await queued.catch(() => {});
+      closing = true;
+      eventAbort.abort();
+      try {
+        await ready;
+      } catch {
+        // ignore boot errors
+      }
+      server?.close();
     },
   };
 
-  async function runOnce(text: string) {
-    const args = [
-      "opencode",
-      "run",
-      "--format",
-      "json",
-      ...(sessionId ? ["--session", sessionId] : []),
-      ...spawn.argv,
-      "--",
-      text,
-    ];
-    const proc = Bun.spawn({
-      cmd: args,
-      cwd: spawn.cwd,
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    activeProc = proc;
-
+  async function boot() {
     try {
-      await Promise.all([
-        streamLines(proc.stdout, (line) => handleEvent(line, spawn, (id) => (sessionId = id))),
-        streamLines(proc.stderr, (line) => process.stderr.write(`[opencode] ${line}\n`)),
-      ]);
-
-      const code = await proc.exited;
-      if (code !== 0) {
-        spawn.emit({
-          type: "error",
-          message: `opencode exited with code ${code}`,
-        });
-      }
+      server = await createOpencodeServer({ hostname: "127.0.0.1", port: 0 });
+      client = createOpencodeClient({ baseUrl: server.url });
+      spawn.emit({ type: "ready", agent: "opencode" });
+      void streamEvents();
     } catch (err) {
-      spawn.emit({
-        type: "error",
-        message: `opencode stream failed: ${err instanceof Error ? err.message : String(err)}`,
+      spawn.emit({ type: "error", message: `opencode boot failed: ${errMsg(err)}`, fatal: true });
+      spawn.emit({ type: "agent_exit", code: null });
+      throw err;
+    }
+  }
+
+  async function ensureSession(c: OpencodeClient): Promise<string> {
+    if (sessionId) return sessionId;
+    const created = await c.session.create({
+      query: { directory: spawn.cwd },
+      body: { title: "Vellum" },
+    });
+    const id = created.data?.id;
+    if (!id) throw new Error("opencode session create returned no id");
+    sessionId = id;
+    return id;
+  }
+
+  async function runOnce(text: string) {
+    try {
+      await ready;
+      if (!client) throw new Error("opencode client not initialized");
+      const id = await ensureSession(client);
+      await client.session.prompt({
+        path: { id },
+        query: { directory: spawn.cwd },
+        body: { parts: [{ type: "text", text }] },
       });
-    } finally {
-      activeProc = null;
+    } catch (err) {
+      if (closing) return;
+      spawn.emit({ type: "error", message: `opencode prompt failed: ${errMsg(err)}` });
+    }
+  }
+
+  async function streamEvents() {
+    if (!client) return;
+    while (!closing) {
+      try {
+        const result = await client.event.subscribe({
+          signal: eventAbort.signal,
+          query: { directory: spawn.cwd },
+        });
+        for await (const event of result.stream) {
+          if (closing) return;
+          handleEvent(event as Event, spawn, seenTool, seenTextEnd);
+        }
+      } catch (err) {
+        if (closing) return;
+        process.stderr.write(`[opencode] event stream error: ${errMsg(err)}\n`);
+        await sleep(1000);
+      }
     }
   }
 }
 
-async function streamLines(stream: ReadableStream<Uint8Array>, onLine: (l: string) => void) {
-  const decoder = new TextDecoder();
-  let buf = "";
-  for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) {
-    buf += decoder.decode(chunk, { stream: true });
-    let idx = buf.indexOf("\n");
-    while (idx >= 0) {
-      const line = buf.slice(0, idx).trim();
-      buf = buf.slice(idx + 1);
-      if (line) onLine(line);
-      idx = buf.indexOf("\n");
-    }
+function handleEvent(
+  event: Event,
+  spawn: AgentSpawn,
+  seenTool: Map<string, "started" | "done">,
+  seenTextEnd: Set<string>,
+) {
+  if (event.type !== "message.part.updated") return;
+  const { part, delta } = event.properties;
+  if (part.type === "text") {
+    handleTextPart(part, delta, spawn, seenTextEnd);
+    return;
   }
-  buf += decoder.decode();
-  if (buf.trim()) onLine(buf.trim());
+  if (part.type === "tool") {
+    handleToolPart(part, spawn, seenTool);
+  }
 }
 
-interface OpenCodeEvent {
-  type?: string;
-  text?: string;
-  name?: string;
-  session_id?: string;
-  sessionID?: string;
+function handleTextPart(
+  part: Extract<Part, { type: "text" }>,
+  delta: string | undefined,
+  spawn: AgentSpawn,
+  seenTextEnd: Set<string>,
+) {
+  if (typeof delta === "string" && delta.length > 0) {
+    spawn.emit({ type: "assistant_partial", text: delta });
+    return;
+  }
+  if (part.time?.end !== undefined && !seenTextEnd.has(part.id)) {
+    seenTextEnd.add(part.id);
+    spawn.emit({ type: "assistant_text", text: part.text });
+  }
 }
 
-function handleEvent(line: string, spawn: AgentSpawn, captureSession: (id: string) => void) {
-  let evt: OpenCodeEvent;
-  try {
-    evt = JSON.parse(line) as OpenCodeEvent;
-  } catch {
+function handleToolPart(
+  part: Extract<Part, { type: "tool" }>,
+  spawn: AgentSpawn,
+  seenTool: Map<string, "started" | "done">,
+) {
+  const status = part.state.status;
+  const prior = seenTool.get(part.callID);
+  if ((status === "pending" || status === "running") && prior !== "started" && prior !== "done") {
+    seenTool.set(part.callID, "started");
+    spawn.emit({ type: "tool_use", name: part.tool, toolUseId: part.callID });
     return;
   }
-  if (evt.session_id && typeof evt.session_id === "string") captureSession(evt.session_id);
-  if (evt.sessionID && typeof evt.sessionID === "string") captureSession(evt.sessionID);
+  if ((status === "completed" || status === "error") && prior !== "done") {
+    seenTool.set(part.callID, "done");
+    spawn.emit({
+      type: "tool_result",
+      name: part.tool,
+      ok: status === "completed",
+    });
+  }
+}
 
-  if (evt.type === "delta" && typeof evt.text === "string") {
-    spawn.emit({ type: "assistant_partial", text: evt.text });
-    return;
-  }
-  if (evt.type === "message" && typeof evt.text === "string") {
-    spawn.emit({ type: "assistant_text", text: evt.text });
-    return;
-  }
-  if (evt.type === "tool" && typeof evt.name === "string") {
-    spawn.emit({ type: "tool_use", name: evt.name });
-    return;
-  }
-  if (typeof evt.text === "string") {
-    spawn.emit({ type: "assistant_text", text: evt.text });
-  }
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }

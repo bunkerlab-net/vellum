@@ -21,6 +21,8 @@ export default function App() {
   const [thinking, setThinking] = useState(false);
   const [agentLabel, setAgentLabel] = useState<string>("claude");
   const [permissionMode, setPermissionModeState] = useState<string>("default");
+  const [model, setModelState] = useState<string>("");
+  const [effort, setEffortState] = useState<string>("");
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [characterRefresh, setCharacterRefresh] = useState(0);
@@ -38,10 +40,18 @@ export default function App() {
         case "ready":
           setAgentLabel(msg.agent);
           if (msg.permissionMode) setPermissionModeState(msg.permissionMode);
+          if (typeof msg.model === "string") setModelState(msg.model);
+          if (typeof msg.effort === "string") setEffortState(msg.effort);
           setErrorBanner(null);
           break;
         case "permission_mode":
           setPermissionModeState(msg.mode);
+          break;
+        case "model":
+          setModelState(msg.model);
+          break;
+        case "effort":
+          setEffortState(msg.effort);
           break;
         case "user_echo":
           setEntries((es) => {
@@ -131,12 +141,8 @@ export default function App() {
     [nextId],
   );
 
-  const { state, send, sendToolReply, setPermissionMode, interrupt, restart } = useTransport(handleMessage);
-
-  const togglePermissionMode = () => {
-    const next = permissionMode === "acceptEdits" ? "default" : "acceptEdits";
-    setPermissionMode(next);
-  };
+  const { state, send, sendToolReply, setPermissionMode, setModel, setEffort, interrupt, restart } =
+    useTransport(handleMessage);
 
   const submitAskAnswers = (toolUseId: string, questions: AskQuestion[], answers: (string[] | null)[]) => {
     const lines = questions.map((q, i) => {
@@ -281,9 +287,6 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen((o) => !o)}
         sessionLabel={sessionLabel}
         dayLabel={dayLabel}
-        agent={agentLabel}
-        permissionMode={permissionMode}
-        onTogglePermissionMode={togglePermissionMode}
         canSwitchCharacter={showChat}
         onSwitchCharacter={() => {
           setEntries([]);
@@ -368,7 +371,28 @@ export default function App() {
         {hasSelection && <CharacterPanel character={character} />}
       </main>
 
-      <SettingsMenu open={settingsOpen} settings={settings} onChange={update} onClose={() => setSettingsOpen(false)} />
+      <SettingsMenu
+        open={settingsOpen}
+        settings={settings}
+        onChange={update}
+        onClose={() => setSettingsOpen(false)}
+        agent={agentLabel}
+        model={model}
+        effort={effort}
+        permissionMode={permissionMode}
+        onModelChange={(m) => {
+          setModelState(m);
+          setModel(m);
+        }}
+        onEffortChange={(e) => {
+          setEffortState(e);
+          setEffort(e);
+        }}
+        onPermissionModeChange={(m) => {
+          setPermissionModeState(m);
+          setPermissionMode(m);
+        }}
+      />
     </div>
   );
 }

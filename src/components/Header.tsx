@@ -8,9 +8,6 @@ interface Props {
   onOpenSettings: () => void;
   sessionLabel: string | null;
   dayLabel: string | null;
-  agent: string;
-  permissionMode: string;
-  onTogglePermissionMode: () => void;
   canSwitchCharacter: boolean;
   onSwitchCharacter: () => void;
 }
@@ -23,14 +20,9 @@ export default function Header({
   onOpenSettings,
   sessionLabel,
   dayLabel,
-  agent,
-  permissionMode,
-  onTogglePermissionMode,
   canSwitchCharacter,
   onSwitchCharacter,
 }: Props) {
-  const isClaude = agent === "claude";
-  const acceptingEdits = permissionMode === "acceptEdits";
   return (
     <header className="hdr">
       <div className="hdr-side">
@@ -67,21 +59,6 @@ export default function Header({
       </div>
 
       <div className="hdr-side hdr-side-right">
-        {isClaude && (
-          <button
-            type="button"
-            className={`hdr-btn ${acceptingEdits ? "hdr-btn-on" : ""}`}
-            onClick={onTogglePermissionMode}
-            title={
-              acceptingEdits
-                ? "Auto-accept edits ON — click to revert to default prompts"
-                : "Default permissions — click to auto-accept edits"
-            }
-          >
-            <Icon.Shield s={18} />
-            <span>{acceptingEdits ? "Auto-Accept" : "Default"}</span>
-          </button>
-        )}
         {canSwitchCharacter && (
           <button type="button" className="hdr-btn" onClick={onSwitchCharacter} title="Switch character / campaign">
             <Icon.Compass s={18} />

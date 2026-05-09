@@ -1,11 +1,42 @@
 import { useEffect, useRef } from "react";
 import type { Settings } from "../client/settings";
 
+export interface AgentModelOption {
+  value: string;
+  label: string;
+}
+
+export const CLAUDE_MODELS: AgentModelOption[] = [
+  { value: "", label: "SDK default" },
+  { value: "claude-opus-4-7", label: "Opus 4.7" },
+  { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+];
+
+export const EFFORT_LEVELS: { value: string; label: string }[] = [
+  { value: "low", label: "low" },
+  { value: "medium", label: "medium" },
+  { value: "high", label: "high" },
+  { value: "xhigh", label: "xhigh" },
+];
+
+export const PERMISSION_MODES: { value: string; label: string }[] = [
+  { value: "default", label: "Default" },
+  { value: "acceptEdits", label: "Auto-accept" },
+];
+
 interface Props {
   open: boolean;
   settings: Settings;
   onChange: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   onClose: () => void;
+  agent: string;
+  model: string;
+  effort: string;
+  permissionMode: string;
+  onModelChange: (model: string) => void;
+  onEffortChange: (effort: string) => void;
+  onPermissionModeChange: (mode: string) => void;
 }
 
 const PALETTES: {
@@ -22,7 +53,19 @@ const HEADING_FONTS = ["Cinzel", "IM Fell DW Pica", "Cormorant Garamond"];
 const BODY_FONTS = ["IM Fell English", "Cormorant Garamond", "IM Fell DW Pica"];
 const STORY_MODES: Settings["storyMode"][] = ["typewriter", "illuminated", "instant"];
 
-export default function SettingsMenu({ open, settings, onChange, onClose }: Props) {
+export default function SettingsMenu({
+  open,
+  settings,
+  onChange,
+  onClose,
+  agent,
+  model,
+  effort,
+  permissionMode,
+  onModelChange,
+  onEffortChange,
+  onPermissionModeChange,
+}: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
@@ -173,6 +216,70 @@ export default function SettingsMenu({ open, settings, onChange, onClose }: Prop
             onChange={(e) => onChange("ornamentDensity", Number(e.target.value))}
           />
         </div>
+
+        {agent === "claude" && (
+          <>
+            <div className="settings-section">
+              <label htmlFor="settings-model" className="settings-label">
+                Model
+              </label>
+              <select
+                id="settings-model"
+                className="settings-select"
+                value={model}
+                onChange={(e) => onModelChange(e.target.value)}
+              >
+                {CLAUDE_MODELS.map((m) => (
+                  <option key={m.value || "default"} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="settings-section">
+              <div id="settings-effort-label" className="settings-label">
+                Effort
+              </div>
+              <div className="settings-radio-row" role="radiogroup" aria-labelledby="settings-effort-label">
+                {EFFORT_LEVELS.map((m) => (
+                  // biome-ignore lint/a11y/useSemanticElements: pill-style buttons by design
+                  <button
+                    key={m.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={effort === m.value}
+                    className={`settings-radio ${effort === m.value ? "active" : ""}`}
+                    onClick={() => onEffortChange(m.value)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <div id="settings-permission-label" className="settings-label">
+                Permission mode
+              </div>
+              <div className="settings-radio-row" role="radiogroup" aria-labelledby="settings-permission-label">
+                {PERMISSION_MODES.map((m) => (
+                  // biome-ignore lint/a11y/useSemanticElements: pill-style buttons by design
+                  <button
+                    key={m.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={permissionMode === m.value}
+                    className={`settings-radio ${permissionMode === m.value ? "active" : ""}`}
+                    onClick={() => onPermissionModeChange(m.value)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </>
   );
