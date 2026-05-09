@@ -31,6 +31,15 @@ campaigns/<slug>/
 Never silently mutate a character sheet. Edits must be triggered by an in-fiction event the player has witnessed (damage
 taken, gold spent, item gained, level up).
 
+The character sheet keeps gear in two separate H2 blocks — never merge them:
+
+- `## Equipped` — armor, shield, currently-wielded weapons, holy symbol / spellcasting focus, and any attuned magic
+  items being worn. Each row carries a **Slot** (Armor, Shield, Main Hand, Off Hand, Thrown, Holy, Other) and a
+  **Stats** column with the gameplay numbers (AC value, AC bonus, attack-to-hit, damage, range, properties). The
+  Stats column is what the frontend exposes on hover.
+- `## Inventory` — pack items, consumables, quest items, treasure, scrolls not currently equipped, and currency.
+  Each row has Item / Qty / Weight / Notes. Total weight (across both blocks) and carrying capacity live here.
+
 ## Live Persistence
 
 The conversation context is volatile — it can be auto-compacted, summarized, or interrupted at any time. The campaign

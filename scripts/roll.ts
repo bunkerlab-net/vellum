@@ -70,7 +70,15 @@ function parseExpression(raw: string): Term[] {
       throw new Error(`drop/keep count must be > 0 and < dice count (${n}) in "${body}"`);
     }
 
-    terms.push({ kind: "dice", sign, n, sides, op, k, label: body.toLowerCase() });
+    terms.push({
+      kind: "dice",
+      sign,
+      n,
+      sides,
+      op,
+      k,
+      label: body.toLowerCase(),
+    });
     cursor += whole.length;
   }
 
@@ -99,11 +107,19 @@ function rollDiceTerm(term: DiceTerm): DiceResult {
   for (let i = 0; i < term.n; i++) rolls.push(rollDie(term.sides));
 
   if (!term.op) {
-    return { rolls, kept: [...rolls], dropped: [], subtotal: rolls.reduce((a, b) => a + b, 0) };
+    return {
+      rolls,
+      kept: [...rolls],
+      dropped: [],
+      subtotal: rolls.reduce((a, b) => a + b, 0),
+    };
   }
 
   const ascending = rolls.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
-  const k = term.k!;
+  if (term.k == null || term.k <= 0) {
+    throw new Error(`'${term.op}' requires a positive count`);
+  }
+  const k = term.k;
   const n = term.n;
   let dropIdx: Set<number>;
 

@@ -72,7 +72,17 @@ Per PHB, offer two paths:
 - Take the starting equipment package from class + background, OR
 - Roll/take starting gold and buy from the PHB equipment tables.
 
-Build the inventory as a table with item, quantity, and weight. Compute total weight and carrying capacity (STR × 15 lbs).
+Sort the chosen gear into **two separate tables** — never one merged "Equipment" list:
+
+- `## Equipped` — armor, shield, weapons being wielded, holy symbol / spellcasting focus, and any
+  attuned magic items currently worn. Each row carries a **Slot** and a **Stats** column that captures
+  the gameplay-relevant numbers inline (AC value, AC bonus, attack-to-hit, damage, range, special
+  notes). The Stats column is what the frontend exposes on hover.
+- `## Inventory` — everything else: pack items, consumables, quest items, treasure, currency, scrolls
+  not currently equipped.
+
+Compute total weight (sum across both tables) and carrying capacity (STR × 15 lbs). Both go under
+`## Inventory`.
 
 ## 7. Spells (if applicable)
 
@@ -222,11 +232,20 @@ Read back a one-paragraph summary of the character. Ask if the player wants to a
 - **Tools:** ...
 - **Languages:** Common, ...
 
-## Equipment
+## Equipped
 
-| Item | Qty | Weight (lb) |
-| --- | --- | --- |
-| ... | 1 | 0 |
+| Slot | Item | Stats | Weight (lb) |
+| --- | --- | --- | --- |
+| Armor | {{armor}} | AC {{n}} | 0 |
+| Shield | {{shield}} | AC +2 | 0 |
+| Main Hand | {{weapon}} | +0 to hit · 1d6 | 0 |
+| Focus | {{focus}} | spellcasting focus | 0 |
+
+## Inventory
+
+| Item | Qty | Weight (lb) | Notes |
+| --- | --- | --- | --- |
+| ... | 1 | 0 |  |
 
 - **Total weight:** 0 lb / {{capacity}} lb
 - **Currency:** 0 gp / 0 sp / 0 cp

@@ -115,7 +115,7 @@ For each block being regenerated, defer to the relevant section of `/character-c
 - **Stats reset** → §2 (4d6dl1 stat-roll loop, Baldur's-Gate style).
 - **Class reset** → §4.
 - **Background reset** → §5.
-- **Equipment reset** (no inventory carried) → §6 (starting equipment package or starting gold).
+- **Equipment reset** (no gear carried) → §6 (starting equipment package or starting gold; populate `## Equipped` and `## Inventory` per the canonical schema).
 - **Spell selection reset** → §7.
 - **Personality reset** → §8 (only if Personality was unchecked in Q3).
 - **Backstory rewrite** → §8 backstory beats (only if "Rewrite" chosen in Q4).
