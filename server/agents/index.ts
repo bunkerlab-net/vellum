@@ -7,7 +7,7 @@ export const agents: Record<string, AgentFactory> = {
   opencode: opencodeAgent,
 };
 
-export type AgentName = keyof typeof agents | string;
+export type AgentName = keyof typeof agents;
 
 export type {
   Agent,

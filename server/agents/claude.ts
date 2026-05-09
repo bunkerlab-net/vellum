@@ -98,6 +98,9 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
       abortController: abort,
       includePartialMessages: true,
       mcpServers: { vellum: mcp },
+      // We host the picker ourselves, so the SDK MCP tool is always trusted —
+      // without this it falls through to the permission prompt and is denied.
+      allowedTools: ["mcp__vellum__ask"],
       disallowedTools: ["AskUserQuestion"],
       systemPrompt: { type: "preset", preset: "claude_code", append: ASK_SYSTEM_PROMPT },
       permissionMode: opts.permissionMode,
