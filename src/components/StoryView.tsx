@@ -1,7 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Icon } from "./icons";
+
+const LEADING_DROP_CAP = /^(\d+|[A-Za-z])(.*)/s;
+
+function injectDropCap(children: React.ReactNode): React.ReactNode {
+  const arr = Array.isArray(children) ? children : [children];
+  const first = arr[0];
+  if (typeof first !== "string" || first.length === 0) return children;
+  const match = first.match(LEADING_DROP_CAP);
+  if (!match) return children;
+  const [, head, rest] = match;
+  return [
+    <span key="drop-cap" className="drop-cap">
+      {head}
+    </span>,
+    rest,
+    ...arr.slice(1),
+  ];
+}
 
 export type RevealMode = "typewriter" | "illuminated" | "instant";
 
@@ -76,6 +94,94 @@ function StoryEntry({ entry, revealMode, isLatest, playerName, onChoose, onAsk, 
   }, [entry.id, revealMode, isLatest]);
 
   const narratorText = entry.type === "narrator" ? entry.text : "";
+  const dropCap =
+    entry.type === "narrator" && revealMode === "illuminated" && entry.dropCap !== false && !entry.speaker;
+  const textRef = useRef<HTMLDivElement>(null);
+
+  // Recreated every render so the per-render `injected` flag resets — using
+  // useMemo would keep the closure stale across streamed re-renders, which is
+  // why the drop-cap silently disappeared after the first paragraph chunk.
+  let dropCapInjected = false;
+  const components: Components = dropCap
+    ? {
+        p: ({ children, ...props }) => {
+          if (dropCapInjected) return <p {...props}>{children}</p>;
+          const next = injectDropCap(children);
+          if (next === children) return <p {...props}>{children}</p>;
+          dropCapInjected = true;
+          return <p {...props}>{next}</p>;
+        },
+      }
+    : {};
+
+  const animatedCountRef = useRef(0);
+  const prevRevealMode = useRef(revealMode);
+  const prevEntryId = useRef(entry.id);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: entry.id and narratorText force re-stagger on new entry / streamed text
+  useEffect(() => {
+    const root = textRef.current;
+    if (!root) return;
+    const children = Array.from(root.children) as HTMLElement[];
+
+    const modeChanged = prevRevealMode.current !== revealMode;
+    const entryChanged = prevEntryId.current !== entry.id;
+    prevRevealMode.current = revealMode;
+    prevEntryId.current = entry.id;
+
+    let startIdx = animatedCountRef.current;
+
+    if (modeChanged || entryChanged) {
+      // Re-animate every child from scratch
+      startIdx = 0;
+      for (const c of children) {
+        c.style.animation = "none";
+        c.style.removeProperty("opacity");
+        c.style.removeProperty("--reveal-i");
+      }
+      void root.offsetHeight; // force reflow so re-applied animation restarts
+      for (const c of children) {
+        c.style.removeProperty("animation");
+      }
+    } else {
+      // Streaming or quiet re-render: lock already-animated children so a
+      // stray re-render can't replay their fade-in.
+      for (let i = 0; i < startIdx; i++) {
+        const c = children[i];
+        if (!c) continue;
+        c.style.animation = "none";
+        c.style.opacity = "1";
+      }
+    }
+
+    if (revealMode === "instant" || children.length === 0) {
+      for (const c of children) {
+        c.style.animation = "none";
+        c.style.opacity = "1";
+      }
+      animatedCountRef.current = children.length;
+      return;
+    }
+
+    const rect = root.getBoundingClientRect();
+    const viewport = window.innerHeight || document.documentElement.clientHeight;
+    const inView = rect.bottom > 0 && rect.top < viewport;
+
+    for (let i = startIdx; i < children.length; i++) {
+      const c = children[i];
+      if (!c) continue;
+      if (!inView) {
+        c.style.animation = "none";
+        c.style.opacity = "1";
+        continue;
+      }
+      c.style.removeProperty("animation");
+      c.style.removeProperty("opacity");
+      c.style.setProperty("--reveal-i", String(i - startIdx));
+    }
+
+    animatedCountRef.current = children.length;
+  }, [revealMode, entry.id, narratorText]);
 
   if (entry.type === "user") {
     return (
@@ -227,7 +333,7 @@ function StoryEntry({ entry, revealMode, isLatest, playerName, onChoose, onAsk, 
   }
 
   // narrator
-  const dropCap = revealMode === "illuminated" && entry.dropCap !== false && !entry.speaker;
+  if (entry.type !== "narrator") return null;
 
   return (
     <div className={`story-block narrator-block ${revealMode}${dropCap ? " has-drop-cap" : ""}`}>
@@ -238,8 +344,10 @@ function StoryEntry({ entry, revealMode, isLatest, playerName, onChoose, onAsk, 
           <span className="speaker-bullet"></span>
         </div>
       )}
-      <div className={`narrator-text ${revealed ? "revealed" : "hidden-reveal"}`}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{narratorText}</ReactMarkdown>
+      <div ref={textRef} className={`narrator-text ${revealed ? "revealed" : "hidden-reveal"}`}>
+        <ReactMarkdown key={revealMode} remarkPlugins={[remarkGfm]} components={components}>
+          {narratorText}
+        </ReactMarkdown>
       </div>
     </div>
   );

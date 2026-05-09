@@ -360,7 +360,7 @@ export default function App() {
           )}
         </section>
 
-        {hasSelection && <CharacterPanel character={character} onRoll={() => rollD20()} />}
+        {hasSelection && <CharacterPanel character={character} />}
       </main>
 
       <SettingsMenu open={settingsOpen} settings={settings} onChange={update} onClose={() => setSettingsOpen(false)} />

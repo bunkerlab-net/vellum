@@ -36,7 +36,8 @@ export interface Character {
   spellSlots: { level: number; current: number; max: number }[];
   preparedSpells: string[];
   cantrips: string[];
-  equipment: { name: string; qty: number; weight: number }[];
+  equipped: { slot: string; name: string; stats: string; weight: number }[];
+  inventory: { name: string; qty: number; weight: number; notes: string }[];
   currency: { gp: number; sp: number; cp: number; ep: number; pp: number };
   totalWeight: number;
   carryCap: number;
@@ -46,7 +47,6 @@ export interface Character {
   location: string;
   inGameDate: string;
   sessionLabel: string | null;
-  inventory: { name: string; qty: number }[];
 }
 
 export async function loadCharacter(
@@ -166,14 +166,12 @@ function parseCharacter(slug: string, md: string, campaign: string, state: State
   const cantrips = parseListUnderHeading(md, /###\s*Cantrips/i);
   const preparedSpells = parsePreparedSpells(md);
 
-  const equipment = parseEquipment(md);
+  const { equipped, inventory } = parseGear(md);
   const currency = parseCurrency(md);
   const totalWeight = parseSignedBullet(md, "Total weight") ?? 0;
   const carryCap = parseCarryCap(md);
 
   const primaryAttackBonus = parseFirstAttackBonus(md, abilities);
-
-  const inventory = equipment.map((e) => ({ name: e.name, qty: e.qty }));
 
   const sessionLabel = state.sessionActive && state.sessionCounter ? `Session ${roman(state.sessionCounter)}` : null;
 
@@ -197,7 +195,8 @@ function parseCharacter(slug: string, md: string, campaign: string, state: State
     spellSlots,
     preparedSpells,
     cantrips,
-    equipment,
+    equipped,
+    inventory,
     currency,
     totalWeight,
     carryCap,
@@ -207,7 +206,6 @@ function parseCharacter(slug: string, md: string, campaign: string, state: State
     location: state.location ?? "",
     inGameDate: state.inGameDate ?? "",
     sessionLabel,
-    inventory,
   };
 }
 
@@ -388,25 +386,52 @@ function parsePreparedSpells(md: string): string[] {
   return items;
 }
 
-function parseEquipment(md: string): Character["equipment"] {
-  const block = sliceSection(md, "Equipment") ?? "";
-  const out: Character["equipment"] = [];
-  for (const line of block.split("\n")) {
+function parseGear(md: string): {
+  equipped: Character["equipped"];
+  inventory: Character["inventory"];
+} {
+  const equipped: Character["equipped"] = [];
+  const inventory: Character["inventory"] = [];
+
+  const equippedBlock = sliceSection(md, "Equipped");
+  if (equippedBlock) {
+    for (const line of equippedBlock.split("\n")) {
+      const cells = line.split("|").map((c) => c.trim());
+      if (cells.length < 5) continue;
+      const [, slot, name, stats, weight] = cells;
+      if (!slot || /^Slot$/i.test(slot) || /^---/.test(slot)) continue;
+      equipped.push({
+        slot,
+        name,
+        stats,
+        weight: Number(weight.replace(/[^\d.]/g, "")) || 0,
+      });
+    }
+  }
+
+  const inventoryBlock =
+    sliceSection(md, "Inventory") ??
+    // Backwards compat: legacy sheets used a single `## Equipment` block
+    sliceSection(md, "Equipment") ??
+    "";
+  for (const line of inventoryBlock.split("\n")) {
     const cells = line.split("|").map((c) => c.trim());
     if (cells.length < 4) continue;
-    const [, name, qty, weight] = cells;
+    const [, name, qty, weight, notes = ""] = cells;
     if (!name || /^Item$/i.test(name) || /^---/.test(qty)) continue;
-    out.push({
+    inventory.push({
       name,
       qty: Number(qty.replace(/[^\d]/g, "")) || 1,
       weight: Number(weight.replace(/[^\d.]/g, "")) || 0,
+      notes: notes.trim(),
     });
   }
-  return out;
+
+  return { equipped, inventory };
 }
 
 function parseCurrency(md: string): Character["currency"] {
-  const block = sliceSection(md, "Equipment") ?? md;
+  const block = sliceSection(md, "Inventory") ?? sliceSection(md, "Equipment") ?? md;
   const c: Character["currency"] = { gp: 0, sp: 0, cp: 0, ep: 0, pp: 0 };
   const line = block.match(/\*\*Currency:?\*\*\s*(.+)/i);
   if (!line) return c;
@@ -418,7 +443,7 @@ function parseCurrency(md: string): Character["currency"] {
 }
 
 function parseCarryCap(md: string): number {
-  const block = sliceSection(md, "Equipment") ?? md;
+  const block = sliceSection(md, "Inventory") ?? sliceSection(md, "Equipment") ?? md;
   const m = block.match(/\/\s*(\d+)\s*lb\s*\(STR/i);
   return m ? Number(m[1]) : 150;
 }

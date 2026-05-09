@@ -34,7 +34,8 @@ export interface Character {
   spellSlots: { level: number; current: number; max: number }[];
   preparedSpells: string[];
   cantrips: string[];
-  equipment: { name: string; qty: number; weight: number }[];
+  equipped: { slot: string; name: string; stats: string; weight: number }[];
+  inventory: { name: string; qty: number; weight: number; notes: string }[];
   currency: { gp: number; sp: number; cp: number; ep: number; pp: number };
   totalWeight: number;
   carryCap: number;
@@ -44,7 +45,6 @@ export interface Character {
   location: string;
   inGameDate: string;
   sessionLabel: string | null;
-  inventory: { name: string; qty: number }[];
 }
 
 export function useCharacter(

@@ -1,6 +1,49 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Character } from "../client/character";
 import { Icon } from "./icons";
+
+function HoverDetails({ children, details }: { children: ReactNode; details: ReactNode | null }) {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const anchorRef = useRef<HTMLButtonElement>(null);
+
+  if (details == null) {
+    return <div className="hover-anchor">{children}</div>;
+  }
+
+  const open = () => {
+    const el = anchorRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setPos({ top: rect.top, left: rect.left });
+    setShow(true);
+  };
+
+  return (
+    <>
+      <button
+        ref={anchorRef}
+        type="button"
+        className="hover-anchor is-hoverable"
+        onMouseEnter={open}
+        onMouseLeave={() => setShow(false)}
+        onFocus={open}
+        onBlur={() => setShow(false)}
+      >
+        {children}
+      </button>
+      {show &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="hover-popover" style={{ top: pos.top, left: pos.left }}>
+            {details}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
 
 function StatPip({ label, cur, max, color }: { label: string; cur: number; max: number; color: string }) {
   const pct = max > 0 ? (cur / max) * 100 : 0;
@@ -67,7 +110,31 @@ function ordinalSuffix(n: number): string {
   }
 }
 
-function SectionHeader({ children }: { children: ReactNode }) {
+function SectionHeader({
+  children,
+  collapsible,
+  collapsed,
+  onToggle,
+}: {
+  children: ReactNode;
+  collapsible?: boolean;
+  collapsed?: boolean;
+  onToggle?: () => void;
+}) {
+  if (collapsible) {
+    return (
+      <button
+        type="button"
+        className={`sec-hdr sec-hdr-toggle ${collapsed ? "is-collapsed" : ""}`}
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+      >
+        <span className="sec-hdr-flank">{collapsed ? "▸" : "▾"}</span>
+        <span className="sec-hdr-text">{children}</span>
+        <span className="sec-hdr-flank">{collapsed ? "◂" : "▾"}</span>
+      </button>
+    );
+  }
   return (
     <div className="sec-hdr">
       <span className="sec-hdr-flank">⊰</span>
@@ -79,10 +146,36 @@ function SectionHeader({ children }: { children: ReactNode }) {
 
 interface Props {
   character: Character | null;
-  onRoll: () => void;
 }
 
-export default function CharacterPanel({ character, onRoll }: Props) {
+const INVENTORY_COLLAPSED_KEY = "vellum.inventoryCollapsed";
+
+function loadCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(INVENTORY_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export default function CharacterPanel({ character }: Props) {
+  const [inventoryCollapsed, setInventoryCollapsed] = useState(loadCollapsed);
+
+  const toggleInventory = () => {
+    setInventoryCollapsed((prev) => {
+      const next = !prev;
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(INVENTORY_COLLAPSED_KEY, next ? "1" : "0");
+        }
+      } catch {
+        // ignore quota errors
+      }
+      return next;
+    });
+  };
+
   if (!character) {
     return (
       <aside className="char-panel">
@@ -102,13 +195,8 @@ export default function CharacterPanel({ character, onRoll }: Props) {
 
   const c = character;
   const firstSlot = c.spellSlots[0];
-  const persuasion = c.skills?.persuasion;
-  const persuasionStr = typeof persuasion === "number" ? (persuasion >= 0 ? `+${persuasion}` : `${persuasion}`) : "—";
   const toHit = c.primaryAttackBonus;
   const toHitStr = toHit >= 0 ? `+${toHit}` : `${toHit}`;
-
-  const inventoryCells = c.inventory.slice(0, 12);
-  const blanks = Math.max(0, 12 - inventoryCells.length);
 
   return (
     <aside className="char-panel">
@@ -213,52 +301,95 @@ export default function CharacterPanel({ character, onRoll }: Props) {
             return <AbilityScore key={k} name={k} score={a.score} modifier={a.modifier} save={a.save} />;
           })}
         </div>
-        <button type="button" className="roll-btn" onClick={onRoll}>
-          <Icon.D20 s={16} />
-          <span>Roll Charisma (Persuasion)</span>
-          <span className="roll-btn-mod">{persuasionStr}</span>
-        </button>
       </div>
 
       <div className="char-section">
-        <SectionHeader>Equipment</SectionHeader>
-        <div className="equip-list">
-          {c.equipment.map((e) => (
-            <div key={e.name} className="equip-row q-common">
-              <span className="equip-slot">{e.qty > 1 ? `×${e.qty}` : ""}</span>
-              <span className="equip-name">{e.name}</span>
-            </div>
-          ))}
-        </div>
+        <SectionHeader>Equipped</SectionHeader>
+        {c.equipped.length === 0 ? (
+          <div className="gear-empty">Nothing equipped.</div>
+        ) : (
+          <div className="gear-list">
+            {c.equipped.map((e) => (
+              <HoverDetails
+                key={`${e.slot}-${e.name}`}
+                details={
+                  e.stats ? (
+                    <>
+                      <div className="hover-popover-head">{e.name}</div>
+                      <div className="hover-popover-meta">{e.slot}</div>
+                      <div className="hover-popover-body">{e.stats}</div>
+                      {e.weight > 0 && <div className="hover-popover-foot">{e.weight} lb</div>}
+                    </>
+                  ) : null
+                }
+              >
+                <div className="gear-row">
+                  <span className="gear-slot">{e.slot}</span>
+                  <span className="gear-name">{e.name}</span>
+                </div>
+              </HoverDetails>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="char-section">
-        <SectionHeader>Inventory</SectionHeader>
-        <div className="inv-grid">
-          {inventoryCells.map((it) => (
-            <div key={it.name} className="inv-cell kind-gear" title={it.name}>
-              <div className="inv-icon">◈</div>
-              <div className="inv-qty">{it.qty}</div>
+        <SectionHeader collapsible collapsed={inventoryCollapsed} onToggle={toggleInventory}>
+          Inventory ({c.inventory.length})
+        </SectionHeader>
+        {!inventoryCollapsed && (
+          <>
+            {c.inventory.length === 0 ? (
+              <div className="gear-empty">Pack is empty.</div>
+            ) : (
+              <div className="gear-list">
+                {c.inventory.map((it) => (
+                  <HoverDetails
+                    key={it.name}
+                    details={
+                      it.notes || it.weight > 0 ? (
+                        <>
+                          <div className="hover-popover-head">{it.name}</div>
+                          {it.notes && <div className="hover-popover-body">{it.notes}</div>}
+                          {it.weight > 0 && (
+                            <div className="hover-popover-foot">
+                              {it.weight} lb
+                              {it.qty > 1 ? ` each · ${it.weight * it.qty} lb total` : ""}
+                            </div>
+                          )}
+                        </>
+                      ) : null
+                    }
+                  >
+                    <div className="gear-row">
+                      <span className="gear-qty">{it.qty > 1 ? `×${it.qty}` : ""}</span>
+                      <span className="gear-name">{it.name}</span>
+                      {it.notes && (
+                        <span className="gear-hint" aria-hidden="true">
+                          ·
+                        </span>
+                      )}
+                    </div>
+                  </HoverDetails>
+                ))}
+              </div>
+            )}
+            <div className="purse-row">
+              <span className="purse-pip gp">
+                <Icon.Coin s={12} /> {c.currency.gp}
+                <small>gp</small>
+              </span>
+              <span className="purse-pip sp">
+                {c.currency.sp}
+                <small>sp</small>
+              </span>
+              <span className="purse-pip cp">
+                {c.currency.cp}
+                <small>cp</small>
+              </span>
             </div>
-          ))}
-          {Array.from({ length: blanks }, (_, i) => `blank-${i}`).map((id) => (
-            <div key={id} className="inv-cell empty"></div>
-          ))}
-        </div>
-        <div className="purse-row">
-          <span className="purse-pip gp">
-            <Icon.Coin s={12} /> {c.currency.gp}
-            <small>gp</small>
-          </span>
-          <span className="purse-pip sp">
-            {c.currency.sp}
-            <small>sp</small>
-          </span>
-          <span className="purse-pip cp">
-            {c.currency.cp}
-            <small>cp</small>
-          </span>
-        </div>
+          </>
+        )}
       </div>
     </aside>
   );

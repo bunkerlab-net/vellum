@@ -474,27 +474,38 @@ button {
 .narrator-text.hidden-reveal {
   opacity: 0;
 }
-.narrator-block.typewriter .narrator-text.revealed {
-  animation: narrator-typewriter 0.9s ease-out forwards;
-}
-.narrator-block.illuminated .narrator-text.revealed {
-  animation: narrator-illuminated 0.7s ease-out forwards;
-}
 .narrator-block.instant .narrator-text {
   opacity: 1;
 }
+/* Per-paragraph staggered reveal. JS sets --reveal-i on each top-level child. */
+.narrator-block.typewriter .narrator-text.revealed > *,
+.narrator-block.illuminated .narrator-text.revealed > * {
+  opacity: 0;
+  animation-duration: 500ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+  animation-delay: calc(var(--reveal-i, 0) * 180ms);
+}
+.narrator-block.typewriter .narrator-text.revealed > * {
+  animation-name: narrator-paragraph-typewriter;
+}
+.narrator-block.illuminated .narrator-text.revealed > * {
+  animation-name: narrator-paragraph-illuminated;
+}
 
-@keyframes narrator-typewriter {
+@keyframes narrator-paragraph-typewriter {
   0% {
     opacity: 0;
     filter: blur(2px);
+    transform: translateY(4px);
   }
   100% {
     opacity: 1;
     filter: blur(0);
+    transform: translateY(0);
   }
 }
-@keyframes narrator-illuminated {
+@keyframes narrator-paragraph-illuminated {
   0% {
     opacity: 0;
   }
@@ -503,8 +514,9 @@ button {
   }
 }
 
-/* Illuminated drop-cap on the first paragraph's first letter */
-.narrator-block.has-drop-cap .narrator-text > p:first-of-type::first-letter {
+/* Illuminated drop-cap. Wrapped via the markdown `p` override so the leading
+   token (letter or multi-digit number) is one styled span. */
+.drop-cap {
   font-family: var(--font-heading);
   font-size: 56px;
   line-height: 0.85;
@@ -1218,6 +1230,29 @@ button {
 .sec-hdr-flank {
   display: none;
 }
+/* Collapsible variant: button reset, gold caret in the flank slot. */
+.sec-hdr-toggle {
+  display: flex;
+  width: calc(100% + 8px);
+  cursor: pointer;
+}
+.sec-hdr-toggle:hover .sec-hdr-text {
+  color: var(--parchment);
+}
+.sec-hdr-toggle:focus-visible {
+  outline: 1px solid var(--gold-bright);
+  outline-offset: -3px;
+}
+.sec-hdr-toggle .sec-hdr-flank {
+  display: inline;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--gold);
+  letter-spacing: 0;
+  width: 12px;
+  text-align: center;
+}
+/* biome-ignore lint/style/noDescendingSpecificity: hover variant on `.sec-hdr-toggle` overrides the color intentionally */
 .sec-hdr-text {
   font-family: var(--font-heading);
   font-size: 13px;
@@ -1455,105 +1490,163 @@ button {
 }
 
 /* Equipment */
-.equip-list {
+/* Equipped + Inventory share the same list shape */
+.gear-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  margin-bottom: 10px;
 }
-.equip-row {
+.gear-row {
   display: grid;
-  grid-template-columns: 78px 1fr;
-  gap: 10px;
-  padding: 7px 10px;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  padding: 6px 10px;
   background: rgba(0, 0, 0, 0.3);
-  border-left: 3px solid;
+  border-left: 2px solid rgba(201, 169, 97, 0.35);
   align-items: baseline;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
 }
-.equip-slot {
+/* Equipped rows use a wider slot column for the SLOT label. */
+.gear-row:has(.gear-slot) {
+  grid-template-columns: 78px 1fr auto;
+}
+.gear-slot {
   font-family: var(--font-heading);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.15em;
   color: var(--parchment-dim);
+  text-transform: uppercase;
 }
-.equip-name {
+.gear-qty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--parchment-dim);
+  text-align: right;
+  min-width: 0;
+}
+.gear-row:not(:has(.gear-qty:not(:empty))) .gear-qty {
+  display: none;
+}
+.gear-name {
   font-family: "Cormorant Garamond", "Georgia", serif;
-  font-size: 15px;
-  font-style: normal;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.01em;
+  color: var(--parchment);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
-.q-rare {
-  border-left-color: var(--rare);
+.gear-hint {
+  color: var(--gold);
+  font-size: 11px;
+  letter-spacing: 0;
 }
-.q-rare .equip-name {
-  color: #9ec0f0;
-}
-.q-uncommon {
-  border-left-color: var(--uncommon);
-}
-.q-uncommon .equip-name {
-  color: #b8d098;
-}
-.q-common {
-  border-left-color: var(--common);
-}
-.q-common .equip-name {
-  color: var(--parchment);
+.gear-empty {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--parchment-dim);
+  padding: 6px 10px;
 }
 
-/* Inventory */
-.inv-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
-  margin-bottom: 10px;
-}
-.inv-cell {
+/* Hover anchor: hovered row gets a gold accent; popover floats inline. */
+.hover-anchor {
   position: relative;
-  aspect-ratio: 1;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(201, 169, 97, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
 }
-.inv-cell:not(.empty):hover {
-  border-color: var(--gold);
-  background: rgba(201, 169, 97, 0.1);
-  box-shadow: 0 0 10px rgba(201, 169, 97, 0.3);
+.hover-anchor.is-hoverable {
+  cursor: help;
 }
-.inv-cell.empty {
-  opacity: 0.4;
-  background: rgba(0, 0, 0, 0.6);
+.hover-anchor.is-hoverable:hover .gear-row,
+.hover-anchor.is-hoverable:focus-visible .gear-row {
+  border-left-color: var(--gold-bright);
+  background: rgba(201, 169, 97, 0.08);
 }
-.inv-icon {
-  font-size: 18px;
-  color: var(--gold);
+.hover-anchor.is-hoverable:focus-visible {
+  outline: none;
 }
-.kind-potion .inv-icon {
-  color: var(--blood);
+.hover-anchor.is-hoverable:focus-visible .gear-row {
+  outline: 1px solid var(--gold-bright);
+  outline-offset: 1px;
 }
-.kind-treasure .inv-icon {
-  color: var(--gold-bright);
+.hover-popover {
+  position: fixed;
+  /* JS sets `top` and `left` to anchor row's top-left; we shift left so the
+     popover floats just to the left of the anchor. */
+  transform: translateX(-100%) translateX(-12px);
+  min-width: 200px;
+  max-width: 280px;
+  z-index: 200;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, var(--bg-panel), var(--bg) 85%);
+  border: 1px solid var(--gold);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 8px 24px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  animation: hover-popover-in 120ms ease-out forwards;
 }
-.kind-quest .inv-icon {
-  color: var(--rare);
-}
-.kind-gear .inv-icon {
-  color: var(--parchment);
-}
-.inv-qty {
+.hover-popover::before {
+  content: "";
   position: absolute;
-  bottom: 1px;
-  right: 3px;
-  font-family: var(--font-mono);
+  top: 12px;
+  right: -6px;
+  width: 10px;
+  height: 10px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--gold);
+  border-top: 1px solid var(--gold);
+  transform: rotate(45deg);
+}
+.hover-popover-head {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--gold-bright);
+  margin-bottom: 2px;
+}
+.hover-popover-meta {
+  font-family: var(--font-heading);
   font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+  margin-bottom: 6px;
+}
+.hover-popover-body {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.45;
   color: var(--parchment);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.hover-popover-foot {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(201, 169, 97, 0.25);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--parchment-dim);
+}
+@keyframes hover-popover-in {
+  from {
+    opacity: 0;
+    transform: translateX(-100%) translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-100%) translateX(-12px);
+  }
 }
 
 .purse-row {

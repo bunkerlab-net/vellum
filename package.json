@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "astro": "astro",
-    "build": "astro build",
+    "build": "bun install && astro build",
     "clean": "rm -rf dist node_modules .astro .vite *.tsbuildinfo",
-    "dev": "bun run server/cli.ts --dev",
-    "start": "bun run server/cli.ts"
+    "dev": "bun install && bun run server/cli.ts --dev",
+    "start": "bun install && bun run server/cli.ts"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.4",
