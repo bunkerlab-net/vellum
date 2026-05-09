@@ -279,7 +279,7 @@ function StoryEntry({ entry, revealMode, isLatest, playerName, onChoose, onAsk, 
       <div className="story-block roll-block">
         <div className="roll-card">
           <div className="roll-icon">
-            <Icon.D20 s={28} />
+            <Icon.D20 size={28} />
           </div>
           <div className="roll-info">
             <div className="roll-label">{entry.label}</div>

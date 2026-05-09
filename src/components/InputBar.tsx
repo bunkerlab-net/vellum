@@ -44,7 +44,7 @@ export default function InputBar({ onSend, onRoll, disabled }: Props) {
         aria-disabled={disabled}
         title="Roll d20"
       >
-        <Icon.D20 s={22} />
+        <Icon.D20 size={22} />
       </button>
       <div className="input-divider"></div>
       <textarea
@@ -59,7 +59,7 @@ export default function InputBar({ onSend, onRoll, disabled }: Props) {
       />
       <button type="button" className={`input-send ${disabled ? "disabled" : ""}`} onClick={submit} disabled={disabled}>
         <span>Speak</span>
-        <Icon.Send s={16} />
+        <Icon.Send size={16} />
       </button>
       <div className="input-bar-deco-r"></div>
     </div>

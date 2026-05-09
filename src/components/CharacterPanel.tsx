@@ -240,21 +240,21 @@ export default function CharacterPanel({ character }: Props) {
         {c.hitDice && <StatPip label="HIT DICE" cur={c.hitDice.current} max={c.hitDice.max} color="var(--gold)" />}
         <div className="def-row">
           <div className="def-cell">
-            <Icon.Shield s={18} />
+            <Icon.Shield size={18} />
             <div>
               <div className="def-num">{c.ac}</div>
               <div className="def-lbl">Armor</div>
             </div>
           </div>
           <div className="def-cell">
-            <Icon.Sword s={18} />
+            <Icon.Sword size={18} />
             <div>
               <div className="def-num">{toHitStr}</div>
               <div className="def-lbl">To Hit</div>
             </div>
           </div>
           <div className="def-cell">
-            <Icon.D20 s={18} />
+            <Icon.D20 size={18} />
             <div>
               <div className="def-num">{c.speed}</div>
               <div className="def-lbl">Speed</div>
@@ -376,7 +376,7 @@ export default function CharacterPanel({ character }: Props) {
             )}
             <div className="purse-row">
               <span className="purse-pip gp">
-                <Icon.Coin s={12} /> {c.currency.gp}
+                <Icon.Coin size={12} /> {c.currency.gp}
                 <small>gp</small>
               </span>
               <span className="purse-pip sp">

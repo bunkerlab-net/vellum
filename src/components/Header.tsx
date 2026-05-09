@@ -51,7 +51,7 @@ export default function Header({
 
       <div className="hdr-center">
         <div className="loc-row">
-          <Icon.Compass s={14} />
+          <Icon.Compass size={14} />
           <span className="loc-label">CURRENT LOCATION</span>
         </div>
         <div className="loc-name">{location}</div>
@@ -61,16 +61,16 @@ export default function Header({
       <div className="hdr-side hdr-side-right">
         {canSwitchCharacter && (
           <button type="button" className="hdr-btn" onClick={onSwitchCharacter} title="Switch character / campaign">
-            <Icon.Scroll s={18} />
+            <Icon.Scroll size={18} />
             <span>Switch</span>
           </button>
         )}
         <button type="button" className="hdr-btn" onClick={onToggleSound} title="Toggle sound">
-          <Icon.Sound s={18} muted={!soundOn} />
+          <Icon.Sound size={18} muted={!soundOn} />
           <span>{soundOn ? "Bardic Tune" : "Silenced"}</span>
         </button>
         <button type="button" className="hdr-btn" onClick={onOpenSettings} title="Settings">
-          <Icon.Gear s={18} />
+          <Icon.Gear size={18} />
           <span>Settings</span>
         </button>
         {sessionLabel && (
