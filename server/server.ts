@@ -116,7 +116,7 @@ export async function startServer(opts: StartOptions) {
   };
 
   const spawnAgent = (resumeId?: string) => {
-    const factory = agents[opts.agentName] ?? agents.claude;
+    const factory = opts.agentName in agents ? agents[opts.agentName as keyof typeof agents] : agents.claude;
     let argv = opts.agentArgv;
     if (opts.agentName === "claude") {
       argv = permissionFlags(permissionMode, argv);

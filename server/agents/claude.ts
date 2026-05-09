@@ -30,6 +30,14 @@ function parseClaudeArgs(argv: string[]): ParsedClaudeArgs {
       if (v === "acceptEdits" || v === "default") out.permissionMode = v;
       continue;
     }
+    if (a.startsWith("--resume=")) {
+      out.resume = a.slice("--resume=".length);
+      continue;
+    }
+    if (a.startsWith("-r=")) {
+      out.resume = a.slice("-r=".length);
+      continue;
+    }
     if ((a === "--resume" || a === "-r") && i + 1 < argv.length && !argv[i + 1].startsWith("-")) {
       out.resume = argv[++i];
     }

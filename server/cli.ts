@@ -18,7 +18,7 @@ for (let i = 0; i < raw.length; i++) {
     flags.add(arg);
     continue;
   }
-  if (agentName == null && !arg.startsWith("-") && agents[arg]) {
+  if (agentName == null && !arg.startsWith("-") && arg in agents) {
     agentName = arg;
     continue;
   }
