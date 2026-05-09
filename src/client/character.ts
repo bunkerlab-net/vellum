@@ -67,7 +67,8 @@ export function useCharacter(
       .then((d: Character) => {
         if (!cancelled) setData(d);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error(`[useCharacter] fetch failed for ${campaign}/${character}:`, err);
         if (!cancelled) setData(null);
       });
     return () => {
@@ -93,7 +94,8 @@ export function useCampaigns(refreshTrigger: number = 0): CampaignListing[] {
       .then((d: CampaignListing[]) => {
         if (!cancelled) setList(d);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("[useCampaigns] fetch /api/campaigns failed:", err);
         if (!cancelled) setList([]);
       });
     return () => {

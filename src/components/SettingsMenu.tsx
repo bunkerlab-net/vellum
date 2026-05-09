@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { Settings } from "../client/settings";
 
 interface Props {
@@ -23,23 +23,61 @@ const BODY_FONTS = ["IM Fell English", "Cormorant Garamond", "IM Fell DW Pica"];
 const STORY_MODES: Settings["storyMode"][] = ["typewriter", "illuminated", "instant"];
 
 export default function SettingsMenu({ open, settings, onChange, onClose }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.focus();
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusables = root.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusables.length === 0) {
+        e.preventDefault();
+        root.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || active === root)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
       }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      restoreFocusRef.current?.focus();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
   return (
     <>
       <button type="button" aria-label="Close settings" className="settings-scrim" onClick={onClose} />
-      <div className="settings-popover" role="dialog" aria-modal="true" aria-label="Settings">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="settings-popover"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+      >
         <div className="settings-section">
           <div id="settings-palette-label" className="settings-label">
             Palette

@@ -9,7 +9,7 @@ function HoverDetails({ children, details }: { children: ReactNode; details: Rea
   const anchorRef = useRef<HTMLButtonElement>(null);
 
   if (details == null) {
-    return <div className="hover-anchor">{children}</div>;
+    return <span className="hover-anchor">{children}</span>;
   }
 
   const open = () => {

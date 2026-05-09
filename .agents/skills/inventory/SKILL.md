@@ -21,6 +21,10 @@ under `## Inventory`.
 ## 0. Prerequisites
 
 - Determine campaign slug + active character.
+- **Inventory changes must only be applied when triggered by an in-fiction event the player has
+  observed** (loot picked up, coin spent, gear equipped on screen, item handed off). Per
+  `AGENTS.md` Live Persistence, never silently mutate the sheet — every save/beat below is gated
+  to that witnessed event.
 
 ## 1. Determine Action
 
