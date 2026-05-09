@@ -61,7 +61,7 @@ export default function Header({
       <div className="hdr-side hdr-side-right">
         {canSwitchCharacter && (
           <button type="button" className="hdr-btn" onClick={onSwitchCharacter} title="Switch character / campaign">
-            <Icon.Compass s={18} />
+            <Icon.Scroll s={18} />
             <span>Switch</span>
           </button>
         )}

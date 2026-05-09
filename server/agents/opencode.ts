@@ -4,14 +4,45 @@ import type { Agent, AgentSpawn } from "./types";
 type OpencodeServer = Awaited<ReturnType<typeof createOpencodeServer>>;
 type OpencodeClient = ReturnType<typeof createOpencodeClient>;
 
+const DEDUP_CAP = 1024;
+const STREAM_MAX_RETRIES = 8;
+const STREAM_BACKOFF_BASE_MS = 500;
+const STREAM_BACKOFF_MAX_MS = 30_000;
+
+class BoundedMap<K, V> extends Map<K, V> {
+  constructor(private readonly cap: number) {
+    super();
+  }
+  override set(key: K, value: V): this {
+    if (this.size >= this.cap && !this.has(key)) {
+      const oldest = this.keys().next();
+      if (!oldest.done) this.delete(oldest.value);
+    }
+    return super.set(key, value);
+  }
+}
+
+class BoundedSet<T> extends Set<T> {
+  constructor(private readonly cap: number) {
+    super();
+  }
+  override add(value: T): this {
+    if (this.size >= this.cap && !this.has(value)) {
+      const oldest = this.values().next();
+      if (!oldest.done) this.delete(oldest.value);
+    }
+    return super.add(value);
+  }
+}
+
 export function opencodeAgent(spawn: AgentSpawn): Agent {
   let sessionId: string | undefined;
   let server: OpencodeServer | undefined;
   let client: OpencodeClient | undefined;
   let closing = false;
   const eventAbort = new AbortController();
-  const seenTool = new Map<string, "started" | "done">();
-  const seenTextEnd = new Set<string>();
+  const seenTool = new BoundedMap<string, "started" | "done">(DEDUP_CAP);
+  const seenTextEnd = new BoundedSet<string>(DEDUP_CAP);
   let queued: Promise<void> = Promise.resolve();
 
   const ready = boot();
@@ -86,20 +117,33 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
 
   async function streamEvents() {
     if (!client) return;
+    let attempts = 0;
     while (!closing) {
       try {
         const result = await client.event.subscribe({
           signal: eventAbort.signal,
           query: { directory: spawn.cwd },
         });
+        attempts = 0;
         for await (const event of result.stream) {
           if (closing) return;
           handleEvent(event as Event, spawn, seenTool, seenTextEnd);
         }
       } catch (err) {
         if (closing) return;
-        process.stderr.write(`[opencode] event stream error: ${errMsg(err)}\n`);
-        await sleep(1000);
+        attempts++;
+        process.stderr.write(`[opencode] event stream error (attempt ${attempts}): ${errMsg(err)}\n`);
+        if (attempts >= STREAM_MAX_RETRIES) {
+          spawn.emit({
+            type: "error",
+            message: `opencode event stream failed after ${STREAM_MAX_RETRIES} retries: ${errMsg(err)}`,
+            fatal: true,
+          });
+          spawn.emit({ type: "agent_exit", code: null });
+          return;
+        }
+        const delay = Math.min(STREAM_BACKOFF_MAX_MS, STREAM_BACKOFF_BASE_MS * 2 ** (attempts - 1));
+        await sleep(delay);
       }
     }
   }
