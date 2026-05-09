@@ -4,6 +4,10 @@ An agent-driven, text-based D&D 5e (2014) tabletop RPG. The DM is an AI (Claude 
 on disk — characters, sessions, encounters, quests, world — so play survives interruptions, auto-compaction, and weeks away
 from the table.
 
+Vellum ships with a themed web frontend (Astro + React, served by Bun) that wraps the agent in a chat-style story view
+plus a live character sheet — but the entire game still works through the underlying CLI agent if you'd rather skip the
+browser.
+
 ## How it works
 
 Claude Code reads `AGENTS.md` (symlinked from `CLAUDE.md`) on every session, which establishes the DM role, the 5e ruleset
@@ -11,13 +15,18 @@ scope (all official 2014 sourcebooks), the campaign state layout, the dice proto
 under `.agents/skills/` drive the structured operations: starting a campaign, rolling up a character, opening or closing
 a session, building a balanced encounter, scaffolding a quest.
 
+The web frontend is a thin shell over the agent: a Bun process spawns the agent (Claude / OpenCode / Codex) with `cwd`
+set to the project root, bridges its streamed output to the browser over a WebSocket, and renders the character panel
+by parsing the active campaign's markdown live. The agent's skills, `mise run roll`, and the `campaigns/` tree all keep
+working unchanged — the browser just gives you a nicer surface than a terminal.
+
 The conversation is volatile; the markdown files are authoritative. The DM writes every meaningful change to disk as it
 happens, so any session can resume cleanly — even after a context-window cut or in a brand-new conversation.
 
 ## Requirements
 
-- [Claude Code](https://docs.claude.com/en/docs/claude-code), [OpenCode](https://opencode.ai/)
-  (or any agent that respects `AGENTS.md` + skills)
+- [Claude Code](https://docs.claude.com/en/docs/claude-code), [OpenCode](https://opencode.ai/), or
+  [Codex](https://github.com/openai/codex) (or any agent that respects `AGENTS.md` + skills)
 - [mise](https://mise.jdx.dev) — manages tool versions and the scripts
 
 ## Quick start
@@ -26,12 +35,44 @@ happens, so any session can resume cleanly — even after a context-window cut o
 git clone git@github.com:bunkerlab-net/vellum.git
 cd vellum
 mise trust                # trust mise.toml in this repo
-mise install              # installs bun 1.x
-mise run roll -- 1d20     # smoke test the dice
-claude                    # launch Claude Code in this directory
+mise install              # installs bun 1.x and the rest of the toolchain
+bun start                 # builds the frontend, spawns the agent, opens the browser
 ```
 
-Then, inside Claude Code, invoke a skill:
+`bun start` runs `astro build` if the bundle is stale, binds an HTTP/WebSocket server (default port `4321`, falls back
+to the next free port), spawns the agent with the project root as `cwd`, and opens your browser. Use the gear icon in
+the header to switch palette / fonts / story-mode / model / effort / permission mode mid-session.
+
+### Choosing an agent
+
+Anything after `--` is forwarded to the agent's CLI verbatim:
+
+```bash
+bun start                                          # default: Claude Code
+bun start -- claude --resume hollow-king-antonidus # Claude with extra CLI flags
+bun start -- opencode                              # OpenCode (passes through the OpenCode SDK)
+bun start -- opencode --model anthropic/claude-...  # OpenCode with provider/model override
+bun start -- codex                                 # Codex (supported but untested locally)
+```
+
+The default agent is **Claude Code** via the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview).
+**OpenCode** (via the [`@opencode-ai/sdk`](https://opencode.ai/docs/sdk/)) is fully supported. **Codex** (via
+[`@openai/codex-sdk`](https://github.com/openai/codex)) is wired up against the SDK but currently **untested** —
+the maintainer doesn't run Codex day-to-day, so adapter regressions may slip through.
+
+### Skipping the frontend
+
+If you'd rather drive the DM straight from the terminal — no browser, no Bun server — the original CLI path still works:
+
+```bash
+mise run roll -- 1d20     # smoke test the dice
+claude                    # (or `opencode`, etc.) launched in this directory
+```
+
+The agent reads the same `AGENTS.md` and skills either way; the campaigns directory and dice script don't care which
+front end you use.
+
+Then, inside the agent, invoke a skill:
 
 - `/campaign-creation` — start a new campaign (setting, premise, factions, house rules)
 - `/character-creation` — roll up a level-1 PC, Baldur's Gate-style
@@ -102,6 +143,13 @@ The script (`scripts/roll.ts`) uses `crypto.getRandomValues` with rejection samp
 ├── .claude               # symlink → .agents
 ├── scripts/
 │   └── roll.ts           # Bun dice script
+├── server/               # Bun web server: WS hub, agent adapters, character parser
+│   ├── cli.ts            #   entry point — `bun start` runs this
+│   ├── server.ts         #   Bun.serve (static + /api + /ws)
+│   ├── character.ts      #   markdown -> Character JSON
+│   └── agents/           #   claude / opencode / codex SDK adapters
+├── src/                  # Astro + React frontend (themed chat + character panel)
+├── public/               # static assets served as-is (default portrait, etc.)
 ├── mise.toml             # tool versions + task definitions
 ├── campaigns/            # gitignored — your playthroughs live here
 │   └── <slug>/
@@ -141,8 +189,9 @@ symlinks just keep Claude Code's native conventions working.
 
 ## Status
 
-Working: campaign, character, session, encounter, combat, quest, level-up, rest, and inventory skills, plus dice and
-live persistence.
+Working: campaign, character, session, encounter, combat, quest, level-up, rest, and inventory skills, plus dice,
+live persistence, and the Bun + Astro web frontend with the Claude / OpenCode adapters. Codex adapter ships
+unverified — see [Choosing an agent](#choosing-an-agent).
 
 The structured-state operations are fully covered. Anything outside that scope (free-form roleplay, exploration, social
 encounters, downtime activities) is handled conversationally by the DM with the same live-persistence discipline.
