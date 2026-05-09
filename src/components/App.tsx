@@ -127,21 +127,22 @@ export default function App() {
     [nextId],
   );
 
-  const { state, send, setPermissionMode, interrupt, restart } = useTransport(handleMessage);
+  const { state, send, sendToolReply, setPermissionMode, interrupt, restart } = useTransport(handleMessage);
 
   const togglePermissionMode = () => {
     const next = permissionMode === "acceptEdits" ? "default" : "acceptEdits";
     setPermissionMode(next);
   };
 
-  const submitAskAnswers = (questions: AskQuestion[], answers: (string[] | null)[]) => {
+  const submitAskAnswers = (toolUseId: string, questions: AskQuestion[], answers: (string[] | null)[]) => {
     const lines = questions.map((q, i) => {
       const ans = answers[i] ?? [];
       const heading = q.header || q.question;
       return `${heading}: ${ans.join(", ")}`;
     });
-    const text = lines.length === 1 ? (answers[0]?.join(", ") ?? "") : lines.join("\n");
-    send(text);
+    const display = lines.length === 1 ? (answers[0]?.join(", ") ?? "") : lines.join("\n");
+    setEntries((es) => [...es, { id: nextId(), type: "user", text: display }]);
+    sendToolReply(toolUseId, display);
     setThinking(true);
   };
 
@@ -164,7 +165,7 @@ export default function App() {
         const anyMulti = e.questions.some((qq) => qq.multiSelect);
         const allAnswered = answers.every((a) => a !== null && a.length > 0);
         if (!anyMulti && allAnswered) {
-          submitAskAnswers(e.questions, answers);
+          submitAskAnswers(e.toolUseId, e.questions, answers);
           return { ...e, answers, submitted: true };
         }
         return { ...e, answers };
@@ -178,7 +179,7 @@ export default function App() {
         if (e.id !== entryId || e.type !== "ask" || e.submitted) return e;
         const allAnswered = e.answers.every((a) => a !== null && a.length > 0);
         if (!allAnswered) return e;
-        submitAskAnswers(e.questions, e.answers);
+        submitAskAnswers(e.toolUseId, e.questions, e.answers);
         return { ...e, submitted: true };
       }),
     );
