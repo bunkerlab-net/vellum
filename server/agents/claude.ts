@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   createSdkMcpServer,
   type Query,
@@ -21,6 +24,28 @@ function isEffort(v: unknown): v is EffortLevel {
   return typeof v === "string" && (EFFORT_LEVELS as readonly string[]).includes(v);
 }
 
+// Best-effort: read the user's claude settings file to surface their configured
+// effortLevel back to the UI. The SDK does not expose a getter for the resolved
+// effort, so we mirror the CLI's settings layering at the simplest layer (user)
+// and fall back to undefined if the file is missing or unreadable.
+function readUserEffort(cwd: string): EffortLevel | undefined {
+  const candidates = [
+    join(cwd, ".claude", "settings.local.json"),
+    join(cwd, ".claude", "settings.json"),
+    join(homedir(), ".claude", "settings.json"),
+  ];
+  for (const path of candidates) {
+    try {
+      const raw = readFileSync(path, "utf8");
+      const parsed = JSON.parse(raw) as { effortLevel?: unknown };
+      if (isEffort(parsed.effortLevel)) return parsed.effortLevel;
+    } catch {
+      // ignore — file missing, malformed, or no effortLevel
+    }
+  }
+  return undefined;
+}
+
 const ASK_SYSTEM_PROMPT = [
   "When you would normally use the AskUserQuestion tool to pose curated multi-choice",
   "questions to the player, instead call `mcp__vellum__ask`. The host frontend renders",
@@ -36,7 +61,7 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
   const inbox = createInbox<SDKUserMessage>();
   const abort = new AbortController();
   const initialPermission = isPermissionMode(spawn.permissionMode) ? spawn.permissionMode : undefined;
-  const initialEffort = isEffort(spawn.effort) ? spawn.effort : undefined;
+  const initialEffort: EffortLevel | undefined = isEffort(spawn.effort) ? spawn.effort : readUserEffort(spawn.cwd);
   const initialModel = spawn.model && spawn.model.length > 0 ? spawn.model : undefined;
 
   const askTool = tool(
@@ -101,6 +126,7 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
     spawn,
     (id) => (sessionId = id),
     () => closing,
+    initialEffort,
   );
 
   return {
@@ -146,6 +172,15 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
         process.stderr.write(`[claude] setPermissionMode failed: ${errMsg(err)}\n`);
       });
     },
+    async listModels() {
+      try {
+        const models = await q.supportedModels();
+        return models.map((m) => ({ value: m.value, label: m.displayName }));
+      } catch (err) {
+        process.stderr.write(`[claude] supportedModels failed: ${errMsg(err)}\n`);
+        return [];
+      }
+    },
     interrupt() {
       void q.interrupt().catch((err) => {
         process.stderr.write(`[claude] interrupt failed: ${errMsg(err)}\n`);
@@ -163,10 +198,16 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
   };
 }
 
-async function consume(q: Query, spawn: AgentSpawn, captureSession: (id: string) => void, isClosing: () => boolean) {
+async function consume(
+  q: Query,
+  spawn: AgentSpawn,
+  captureSession: (id: string) => void,
+  isClosing: () => boolean,
+  initialEffort: EffortLevel | undefined,
+) {
   try {
     for await (const msg of q) {
-      handleSdkMessage(msg, spawn.emit, captureSession);
+      handleSdkMessage(msg, spawn.emit, captureSession, initialEffort);
     }
     if (!isClosing()) spawn.emit({ type: "agent_exit", code: 0 });
   } catch (err) {
@@ -176,10 +217,22 @@ async function consume(q: Query, spawn: AgentSpawn, captureSession: (id: string)
   }
 }
 
-function handleSdkMessage(msg: SDKMessage, emit: EmitFn, captureSession: (id: string) => void) {
+function handleSdkMessage(
+  msg: SDKMessage,
+  emit: EmitFn,
+  captureSession: (id: string) => void,
+  initialEffort: EffortLevel | undefined,
+) {
   if (msg.type === "system" && msg.subtype === "init") {
     captureSession(msg.session_id);
-    emit({ type: "ready", agent: "claude", sessionId: msg.session_id });
+    emit({
+      type: "ready",
+      agent: "claude",
+      sessionId: msg.session_id,
+      model: msg.model,
+      permissionMode: msg.permissionMode,
+      effort: initialEffort,
+    });
     return;
   }
   if (msg.type === "stream_event") {

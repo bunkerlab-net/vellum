@@ -76,6 +76,17 @@ export function codexAgent(spawn: AgentSpawn): Agent {
     return thread;
   }
 
+  function rebindThread() {
+    if (!thread) return; // first send() will pick up the new options anyway
+    if (sessionId) {
+      thread = codex.resumeThread(sessionId, buildThreadOptions());
+    } else {
+      // No session id yet (first turn never started) — drop the placeholder and
+      // let the next send() construct a fresh thread with the new options.
+      thread = null;
+    }
+  }
+
   return {
     get sessionId() {
       return sessionId;
@@ -85,19 +96,32 @@ export function codexAgent(spawn: AgentSpawn): Agent {
       queued = next.catch(() => {});
       await next;
     },
-    // The Codex SDK binds model / effort / approval policy at thread creation;
-    // there is no public API to mutate an in-flight thread. The setters update
-    // the *next-thread* options (used after a `restart` that drops the current
-    // thread). Existing thread keeps its original options for the rest of its
-    // lifetime — this is documented behavior, not a bug.
+    // Codex thread options bind at thread construction — there is no in-flight
+    // setter on Thread itself. We swap the live Thread object for a fresh
+    // `resumeThread(id, options)` so the next turn picks up the new model /
+    // effort / approval policy without a server restart, while keeping the
+    // remote conversation by reusing the session id.
     async setModel(model: string) {
       currentModel = model && model.length > 0 ? model : undefined;
+      rebindThread();
     },
     async setEffort(effort: string) {
       currentEffort = isEffort(effort) ? effort : undefined;
+      rebindThread();
     },
     async setPermissionMode(mode: string) {
       currentPermission = mode;
+      rebindThread();
+    },
+    async listModels() {
+      // The Codex SDK does not expose a model-discovery API, so this is a
+      // curated fallback. Users can still type a custom model id by editing
+      // the Codex CLI config directly.
+      return [
+        { value: "gpt-5", label: "GPT-5" },
+        { value: "gpt-5-codex", label: "GPT-5 Codex" },
+        { value: "gpt-5-mini", label: "GPT-5 Mini" },
+      ];
     },
     interrupt() {
       activeAbort?.abort();

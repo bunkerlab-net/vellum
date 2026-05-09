@@ -23,6 +23,7 @@ export default function App() {
   const [permissionMode, setPermissionModeState] = useState<string>("default");
   const [model, setModelState] = useState<string>("");
   const [effort, setEffortState] = useState<string>("");
+  const [availableModels, setAvailableModels] = useState<{ value: string; label: string }[]>([]);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [characterRefresh, setCharacterRefresh] = useState(0);
@@ -198,6 +199,24 @@ export default function App() {
   useEffect(() => {
     if (state === "open") setErrorBanner(null);
   }, [state]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: agentLabel is intentionally a re-fetch trigger when the active agent changes
+  useEffect(() => {
+    if (state !== "open") return;
+    let cancelled = false;
+    fetch("/api/models")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((d: { models: { value: string; label: string }[] }) => {
+        if (!cancelled) setAvailableModels(d.models ?? []);
+      })
+      .catch((err) => {
+        console.error("[app] /api/models failed:", err);
+        if (!cancelled) setAvailableModels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [state, agentLabel]);
 
   useEffect(() => {
     if (!thinking) return;
@@ -380,6 +399,7 @@ export default function App() {
         model={model}
         effort={effort}
         permissionMode={permissionMode}
+        models={availableModels}
         onModelChange={(m) => {
           setModelState(m);
           setModel(m);

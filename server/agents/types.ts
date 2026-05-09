@@ -33,12 +33,18 @@ export type ServerMsg = ServerMsgIn & { seq: number };
 
 export type EmitFn = (msg: ServerMsgIn) => void;
 
+export interface ModelOption {
+  value: string;
+  label: string;
+}
+
 export interface Agent {
   send(text: string): Promise<void>;
   sendToolReply?(toolUseId: string, content: string): Promise<void>;
   setModel?(model: string): Promise<void>;
   setEffort?(effort: string): Promise<void>;
   setPermissionMode?(mode: string): Promise<void>;
+  listModels?(): Promise<ModelOption[]>;
   interrupt(): void;
   close(): Promise<void>;
   readonly sessionId: string | undefined;

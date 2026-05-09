@@ -35,6 +35,15 @@ class BoundedSet<T> extends Set<T> {
   }
 }
 
+type ParsedModel = { providerID: string; modelID: string };
+
+function parseModel(spec: string | undefined): ParsedModel | undefined {
+  if (!spec) return undefined;
+  const idx = spec.indexOf("/");
+  if (idx <= 0 || idx >= spec.length - 1) return undefined;
+  return { providerID: spec.slice(0, idx), modelID: spec.slice(idx + 1) };
+}
+
 export function opencodeAgent(spawn: AgentSpawn): Agent {
   let sessionId: string | undefined;
   let server: OpencodeServer | undefined;
@@ -44,6 +53,7 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
   const seenTool = new BoundedMap<string, "started" | "done">(DEDUP_CAP);
   const seenTextEnd = new BoundedSet<string>(DEDUP_CAP);
   let queued: Promise<void> = Promise.resolve();
+  let currentModel: ParsedModel | undefined = parseModel(spawn.model);
 
   const ready = boot();
 
@@ -55,6 +65,31 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
       const next = queued.then(() => runOnce(text));
       queued = next.catch(() => {});
       await next;
+    },
+    async setModel(model: string) {
+      currentModel = parseModel(model);
+    },
+    async listModels() {
+      try {
+        await ready;
+        if (!client) return [];
+        const r = await client.provider.list({ query: { directory: spawn.cwd } });
+        const all = r.data?.all ?? [];
+        const out: { value: string; label: string }[] = [];
+        for (const provider of all) {
+          for (const model of Object.values(provider.models)) {
+            out.push({
+              value: `${provider.id}/${model.id}`,
+              label: `${provider.name} · ${model.name}`,
+            });
+          }
+        }
+        out.sort((a, b) => a.label.localeCompare(b.label));
+        return out;
+      } catch (err) {
+        process.stderr.write(`[opencode] provider.list failed: ${errMsg(err)}\n`);
+        return [];
+      }
     },
     interrupt() {
       if (!client || !sessionId) return;
@@ -107,7 +142,10 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
       await client.session.prompt({
         path: { id },
         query: { directory: spawn.cwd },
-        body: { parts: [{ type: "text", text }] },
+        body: {
+          parts: [{ type: "text", text }],
+          ...(currentModel ? { model: currentModel } : {}),
+        },
       });
     } catch (err) {
       if (closing) return;

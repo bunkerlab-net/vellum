@@ -1,19 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { Settings } from "../client/settings";
+import Combobox from "./Combobox";
 
 export interface AgentModelOption {
   value: string;
   label: string;
 }
 
-export const CLAUDE_MODELS: AgentModelOption[] = [
-  { value: "", label: "SDK default" },
-  { value: "claude-opus-4-7", label: "Opus 4.7" },
-  { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
-  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
-];
+const AGENTS_WITH_EFFORT = new Set(["claude", "codex"]);
+const AGENTS_WITH_PERMISSION_MODE = new Set(["claude", "codex"]);
 
 export const EFFORT_LEVELS: { value: string; label: string }[] = [
+  { value: "", label: "Inherit" },
   { value: "low", label: "low" },
   { value: "medium", label: "medium" },
   { value: "high", label: "high" },
@@ -25,6 +23,16 @@ export const PERMISSION_MODES: { value: string; label: string }[] = [
   { value: "acceptEdits", label: "Auto-accept" },
 ];
 
+const DEFAULT_LABEL_BY_AGENT: Record<string, string> = {
+  claude: "Use SDK default",
+  opencode: "Use OpenCode default",
+  codex: "Use Codex default",
+};
+
+function findDefaultEntry(models: AgentModelOption[]): AgentModelOption | undefined {
+  return models.find((m) => /default/i.test(m.label) || m.value === "default" || m.value === "");
+}
+
 interface Props {
   open: boolean;
   settings: Settings;
@@ -34,6 +42,7 @@ interface Props {
   model: string;
   effort: string;
   permissionMode: string;
+  models: AgentModelOption[];
   onModelChange: (model: string) => void;
   onEffortChange: (effort: string) => void;
   onPermissionModeChange: (mode: string) => void;
@@ -62,12 +71,21 @@ export default function SettingsMenu({
   model,
   effort,
   permissionMode,
+  models,
   onModelChange,
   onEffortChange,
   onPermissionModeChange,
 }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+
+  const defaultEntry = useMemo(() => findDefaultEntry(models), [models]);
+  const modelOptions = useMemo<AgentModelOption[]>(() => {
+    if (defaultEntry) return models;
+    const prefix: AgentModelOption = { value: "", label: DEFAULT_LABEL_BY_AGENT[agent] ?? "Use default" };
+    return [prefix, ...models];
+  }, [models, agent, defaultEntry]);
+  const modelEmptyLabel = defaultEntry?.label ?? DEFAULT_LABEL_BY_AGENT[agent] ?? "Default";
 
   useEffect(() => {
     if (!open) return;
@@ -149,36 +167,32 @@ export default function SettingsMenu({
           <label htmlFor="settings-heading-font" className="settings-label">
             Heading font
           </label>
-          <select
+          <Combobox
             id="settings-heading-font"
-            className="settings-select"
+            options={HEADING_FONTS.map((f) => ({
+              value: f,
+              label: f,
+              labelStyle: { fontFamily: `"${f}", serif` },
+            }))}
             value={settings.headingFont}
-            onChange={(e) => onChange("headingFont", e.target.value)}
-          >
-            {HEADING_FONTS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onChange("headingFont", v)}
+          />
         </div>
 
         <div className="settings-section">
           <label htmlFor="settings-body-font" className="settings-label">
             Body font
           </label>
-          <select
+          <Combobox
             id="settings-body-font"
-            className="settings-select"
+            options={BODY_FONTS.map((f) => ({
+              value: f,
+              label: f,
+              labelStyle: { fontFamily: `"${f}", serif` },
+            }))}
             value={settings.bodyFont}
-            onChange={(e) => onChange("bodyFont", e.target.value)}
-          >
-            {BODY_FONTS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onChange("bodyFont", v)}
+          />
         </div>
 
         <div className="settings-section">
@@ -217,68 +231,64 @@ export default function SettingsMenu({
           />
         </div>
 
-        {agent === "claude" && (
-          <>
-            <div className="settings-section">
-              <label htmlFor="settings-model" className="settings-label">
-                Model
-              </label>
-              <select
-                id="settings-model"
-                className="settings-select"
-                value={model}
-                onChange={(e) => onModelChange(e.target.value)}
-              >
-                {CLAUDE_MODELS.map((m) => (
-                  <option key={m.value || "default"} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="settings-section">
+          <label htmlFor="settings-model" className="settings-label">
+            Model
+          </label>
+          <Combobox
+            id="settings-model"
+            options={modelOptions}
+            value={model}
+            placeholder="Search models…"
+            emptyLabel={modelEmptyLabel}
+            onChange={onModelChange}
+          />
+        </div>
 
-            <div className="settings-section">
-              <div id="settings-effort-label" className="settings-label">
-                Effort
-              </div>
-              <div className="settings-radio-row" role="radiogroup" aria-labelledby="settings-effort-label">
-                {EFFORT_LEVELS.map((m) => (
-                  // biome-ignore lint/a11y/useSemanticElements: pill-style buttons by design
-                  <button
-                    key={m.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={effort === m.value}
-                    className={`settings-radio ${effort === m.value ? "active" : ""}`}
-                    onClick={() => onEffortChange(m.value)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
+        {AGENTS_WITH_EFFORT.has(agent) && (
+          <div className="settings-section">
+            <div id="settings-effort-label" className="settings-label">
+              Effort
             </div>
+            <div className="settings-radio-row" role="radiogroup" aria-labelledby="settings-effort-label">
+              {EFFORT_LEVELS.map((m) => (
+                // biome-ignore lint/a11y/useSemanticElements: pill-style buttons by design
+                <button
+                  key={m.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={effort === m.value}
+                  className={`settings-radio ${effort === m.value ? "active" : ""}`}
+                  onClick={() => onEffortChange(m.value)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-            <div className="settings-section">
-              <div id="settings-permission-label" className="settings-label">
-                Permission mode
-              </div>
-              <div className="settings-radio-row" role="radiogroup" aria-labelledby="settings-permission-label">
-                {PERMISSION_MODES.map((m) => (
-                  // biome-ignore lint/a11y/useSemanticElements: pill-style buttons by design
-                  <button
-                    key={m.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={permissionMode === m.value}
-                    className={`settings-radio ${permissionMode === m.value ? "active" : ""}`}
-                    onClick={() => onPermissionModeChange(m.value)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
+        {AGENTS_WITH_PERMISSION_MODE.has(agent) && (
+          <div className="settings-section">
+            <div id="settings-permission-label" className="settings-label">
+              Permission mode
             </div>
-          </>
+            <div className="settings-radio-row" role="radiogroup" aria-labelledby="settings-permission-label">
+              {PERMISSION_MODES.map((m) => (
+                // biome-ignore lint/a11y/useSemanticElements: pill-style buttons by design
+                <button
+                  key={m.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={permissionMode === m.value}
+                  className={`settings-radio ${permissionMode === m.value ? "active" : ""}`}
+                  onClick={() => onPermissionModeChange(m.value)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </>

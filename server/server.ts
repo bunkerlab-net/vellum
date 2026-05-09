@@ -9,7 +9,6 @@ export type PermissionMode = "default" | "acceptEdits";
 const PERMISSION_MODES: PermissionMode[] = ["default", "acceptEdits"];
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh"] as const;
 type Effort = (typeof EFFORT_LEVELS)[number];
-const KNOWN_MODELS = new Set(["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]);
 
 function isEffort(v: string): v is Effort {
   return (EFFORT_LEVELS as readonly string[]).includes(v);
@@ -81,6 +80,16 @@ export async function startServer(opts: StartOptions) {
   const onAgentEvent = (msg: ServerMsgIn) => {
     if (msg.type === "ready") {
       if (msg.sessionId) lastSessionId = msg.sessionId;
+      // Sync server-tracked state from whatever the SDK actually loaded so the
+      // frontend's Settings panel reflects the running session, not just what
+      // the user has explicitly overridden.
+      if (typeof msg.model === "string") model = msg.model;
+      if (typeof msg.permissionMode === "string" && PERMISSION_MODES.includes(msg.permissionMode as PermissionMode)) {
+        permissionMode = msg.permissionMode as PermissionMode;
+      }
+      if (typeof msg.effort === "string" && (msg.effort === "" || isEffort(msg.effort))) {
+        effort = msg.effort as Effort | "";
+      }
       respawnAttempts = 0;
     }
     if (msg.type === "agent_exit") {
@@ -159,6 +168,16 @@ export async function startServer(opts: StartOptions) {
 
       if (url.pathname === "/api/permission-mode") {
         return Response.json({ mode: permissionMode });
+      }
+
+      if (url.pathname === "/api/models") {
+        if (!agent?.listModels) return Response.json({ models: [] });
+        try {
+          const models = await agent.listModels();
+          return Response.json({ models });
+        } catch (err) {
+          return new Response(`error: ${errorMessage(err)}`, { status: 500 });
+        }
       }
 
       if (url.pathname.startsWith("/assets/portrait/")) {
@@ -260,10 +279,6 @@ export async function startServer(opts: StartOptions) {
 
         if (msg.type === "set_model") {
           const next = typeof msg.model === "string" ? msg.model : "";
-          if (next.length > 0 && !KNOWN_MODELS.has(next)) {
-            emit({ type: "error", message: `unknown model: ${next}` });
-            return;
-          }
           if (next === model) return;
           model = next;
           emit({ type: "model", model });
