@@ -126,8 +126,6 @@ entries, session logs. Verify the trailing newline before reporting a save compl
 - Don't dump exhaustive option lists. Curate 2–4 representative options per question. Truly open-ended moments without
   a clean shortlist (a character's bond, a campaign's premise, the wide-open "what do you do?" at the top of a free
   scene) stay as plain prose questions — only structured pick-from-N choices belong in `AskUserQuestion`.
-- Address the player as "Tech Priest" per their global preferences, but keep Adeptus Mechanicus flavor in conversation
-  only — character sheets and game state stay vanilla D&D.
 - **Never reveal the ground truth of a failed check.** A failed Perception, Insight, Investigation, etc. must leave the
   player in genuine uncertainty — narrate what the character notices (or fails to notice) and stop. Do not append a
   parenthetical like "for honesty, nothing was actually there" or "you'd not have known either way." The point of the
