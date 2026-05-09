@@ -61,7 +61,9 @@ export default function App() {
             }
             const id = nextId();
             partialEntryId.current = id;
-            return [...es, { id, type: "narrator", text: msg.text }];
+            const prev = es[es.length - 1];
+            const dropCap = prev?.type !== "narrator";
+            return [...es, { id, type: "narrator", text: msg.text, dropCap }];
           });
           break;
         }
@@ -72,7 +74,9 @@ export default function App() {
               partialEntryId.current = null;
               return es.map((e) => (e.id === id && e.type === "narrator" ? { ...e, text: msg.text } : e));
             }
-            return [...es, { id: nextId(), type: "narrator", text: msg.text }];
+            const prev = es[es.length - 1];
+            const dropCap = prev?.type !== "narrator";
+            return [...es, { id: nextId(), type: "narrator", text: msg.text, dropCap }];
           });
           setThinking(false);
           break;

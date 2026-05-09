@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Icon } from "./icons";
@@ -98,21 +98,29 @@ function StoryEntry({ entry, revealMode, isLatest, playerName, onChoose, onAsk, 
     entry.type === "narrator" && revealMode === "illuminated" && entry.dropCap !== false && !entry.speaker;
   const textRef = useRef<HTMLDivElement>(null);
 
-  // Recreated every render so the per-render `injected` flag resets — using
-  // useMemo would keep the closure stale across streamed re-renders, which is
-  // why the drop-cap silently disappeared after the first paragraph chunk.
-  let dropCapInjected = false;
-  const components: Components = dropCap
-    ? {
-        p: ({ children, ...props }) => {
-          if (dropCapInjected) return <p {...props}>{children}</p>;
-          const next = injectDropCap(children);
-          if (next === children) return <p {...props}>{children}</p>;
-          dropCapInjected = true;
-          return <p {...props}>{next}</p>;
-        },
-      }
-    : {};
+  // Reset the drop-cap "already injected" flag when the rendered text or
+  // dropCap toggle changes. We use a ref so the components callback below
+  // observes the latest value, but we still memoize `components` itself so
+  // ReactMarkdown does not rebuild its DOM tree on every parent re-render
+  // (rebuilds remount paragraphs and replay the Illuminated fade-in).
+  const dropCapInjectedRef = useRef(false);
+  const dropCapResetRef = useRef<{ text: string; dropCap: boolean }>({ text: "", dropCap: false });
+  if (dropCapResetRef.current.text !== narratorText || dropCapResetRef.current.dropCap !== dropCap) {
+    dropCapResetRef.current = { text: narratorText, dropCap };
+    dropCapInjectedRef.current = false;
+  }
+  const components: Components = useMemo(() => {
+    if (!dropCap) return {};
+    return {
+      p: ({ children, ...props }) => {
+        if (dropCapInjectedRef.current) return <p {...props}>{children}</p>;
+        const next = injectDropCap(children);
+        if (next === children) return <p {...props}>{children}</p>;
+        dropCapInjectedRef.current = true;
+        return <p {...props}>{next}</p>;
+      },
+    };
+  }, [dropCap]);
 
   const animatedCountRef = useRef(0);
   const prevRevealMode = useRef(revealMode);
