@@ -9,13 +9,14 @@ export type PermissionMode = "default" | "acceptEdits";
 const PERMISSION_MODES: PermissionMode[] = ["default", "acceptEdits"];
 
 function permissionFlags(mode: PermissionMode, raw: string[]): string[] {
-  // Strip any caller-supplied --permission-mode and append our own
+  // Strip any caller-supplied --permission-mode (space- or equals-form) and append our own
   const out: string[] = [];
   for (let i = 0; i < raw.length; i++) {
     if (raw[i] === "--permission-mode") {
-      i++;
+      i++; // skip following value token
       continue;
     }
+    if (raw[i].startsWith("--permission-mode=")) continue;
     out.push(raw[i]);
   }
   out.push("--permission-mode", mode);
@@ -80,12 +81,20 @@ export async function startServer(opts: StartOptions) {
     for (const ws of clients) ws.send(json);
   };
 
-  const emit = (msg: ServerMsgIn) => {
+  const stamp = (msg: ServerMsgIn): ServerMsg => {
     seq++;
     const out: ServerMsg = { ...msg, seq };
     ring.push(out);
     if (ring.length > 200) ring.splice(0, ring.length - 200);
-    broadcast(out);
+    return out;
+  };
+
+  const emit = (msg: ServerMsgIn) => {
+    broadcast(stamp(msg));
+  };
+
+  const sendOnly = (ws: ServerWebSocket<SocketData>, msg: ServerMsgIn) => {
+    ws.send(JSON.stringify(stamp(msg)));
   };
 
   const onAgentEvent = (msg: ServerMsgIn) => {
@@ -198,14 +207,14 @@ export async function startServer(opts: StartOptions) {
           const after = msg.lastSeq ?? 0;
           for (const m of ring) if (m.seq > after) ws.send(JSON.stringify(m));
           if (!ring.some((m) => m.type === "ready")) {
-            emit({
+            sendOnly(ws, {
               type: "ready",
               agent: opts.agentName,
               permissionMode,
             });
           }
           if (!ring.some((m) => m.type === "permission_mode")) {
-            emit({ type: "permission_mode", mode: permissionMode });
+            sendOnly(ws, { type: "permission_mode", mode: permissionMode });
           }
           return;
         }
