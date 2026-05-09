@@ -85,8 +85,12 @@ export function codexAgent(spawn: AgentSpawn): Agent {
       queued = next.catch(() => {});
       await next;
     },
+    // The Codex SDK binds model / effort / approval policy at thread creation;
+    // there is no public API to mutate an in-flight thread. The setters update
+    // the *next-thread* options (used after a `restart` that drops the current
+    // thread). Existing thread keeps its original options for the rest of its
+    // lifetime — this is documented behavior, not a bug.
     async setModel(model: string) {
-      // Codex thread options bind at thread creation; new value applies to the next thread.
       currentModel = model && model.length > 0 ? model : undefined;
     },
     async setEffort(effort: string) {
@@ -182,6 +186,12 @@ function handleItemUpdate(item: ThreadItem, spawn: AgentSpawn, messageText: Map<
     const delta = next.slice(prev.length);
     if (delta.length > 0) spawn.emit({ type: "assistant_partial", text: delta });
   }
+  // Non-append updates (revisions / shrinks) are intentionally not emitted as
+  // partials: `assistant_partial` is append-only on the frontend, so emitting
+  // the new text would double-count. The terminal `item.completed` event
+  // re-emits the full final text via `assistant_text`, which replaces the
+  // narrator entry's text with the canonical value, so any drift here is
+  // reconciled when the message finalizes.
   messageText.set(item.id, next);
 }
 
@@ -205,6 +215,10 @@ function handleItemComplete(
     return;
   }
   if (item.type === "web_search") {
+    // WebSearchItem in @openai/codex-sdk has no status field — the SDK only
+    // exposes `id`, `type`, `query`. Reaching `item.completed` for a
+    // web_search means the search finished; if it had failed it would arrive
+    // as an `error` item instead. Report success accordingly.
     seenItem.set(item.id, "done");
     spawn.emit({ type: "tool_result", name: "web_search", ok: true });
     return;
