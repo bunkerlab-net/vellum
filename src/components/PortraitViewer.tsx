@@ -91,8 +91,16 @@ function PortraitTile({
   onUploaded: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,11 +127,11 @@ function PortraitTile({
         const detail = await r.text().catch(() => "");
         throw new Error(detail || `${r.status}`);
       }
-      onUploaded();
+      if (mountedRef.current) onUploaded();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setUploading(false);
+      if (mountedRef.current) setUploading(false);
     }
   };
 

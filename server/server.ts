@@ -77,6 +77,7 @@ export async function startServer(opts: StartOptions) {
   let lastSessionId: string | undefined;
   let interruptArmed = false;
   let respawnAttempts = 0;
+  let pendingRespawn: ReturnType<typeof setTimeout> | null = null;
   const MAX_RAPID_RESPAWNS = 3;
   const clients = new Set<ServerWebSocket<SocketData>>();
   let nextSocketId = 1;
@@ -123,7 +124,10 @@ export async function startServer(opts: StartOptions) {
       if (wasInterrupted && lastSessionId && respawnAttempts < MAX_RAPID_RESPAWNS) {
         respawnAttempts++;
         // Suppress visible agent_exit, transparently respawn with resume
-        setTimeout(() => spawnAgent(lastSessionId), 50);
+        pendingRespawn = setTimeout(() => {
+          pendingRespawn = null;
+          spawnAgent(lastSessionId);
+        }, 50);
         return;
       }
     }
@@ -274,24 +278,19 @@ export async function startServer(opts: StartOptions) {
         if (msg.type === "hello") {
           const after = msg.lastSeq ?? 0;
           for (const m of ring) if (m.seq > after) ws.send(JSON.stringify(m));
-          if (!ring.some((m) => m.type === "ready")) {
-            sendOnly(ws, {
-              type: "ready",
-              agent: opts.agentName,
-              permissionMode,
-              model,
-              effort,
-            });
-          }
-          if (!ring.some((m) => m.type === "permission_mode")) {
-            sendOnly(ws, { type: "permission_mode", mode: permissionMode });
-          }
-          if (!ring.some((m) => m.type === "model")) {
-            sendOnly(ws, { type: "model", model });
-          }
-          if (!ring.some((m) => m.type === "effort")) {
-            sendOnly(ws, { type: "effort", effort });
-          }
+          // Always re-broadcast a current snapshot — the ring may have rolled, been
+          // cleared on restart, or simply pre-date this client. The synthetic events
+          // are appended so clients can lean on them as the latest authoritative state.
+          sendOnly(ws, {
+            type: "ready",
+            agent: opts.agentName,
+            permissionMode,
+            model,
+            effort,
+          });
+          sendOnly(ws, { type: "permission_mode", mode: permissionMode });
+          sendOnly(ws, { type: "model", model });
+          sendOnly(ws, { type: "effort", effort });
           return;
         }
 
@@ -384,6 +383,11 @@ export async function startServer(opts: StartOptions) {
 
         if (msg.type === "restart") {
           (async () => {
+            // Cancel any pending auto-respawn so it can't race with the explicit restart.
+            if (pendingRespawn !== null) {
+              clearTimeout(pendingRespawn);
+              pendingRespawn = null;
+            }
             emit({ type: "restart", agent: opts.agentName });
             await agent?.close();
             agent = null;

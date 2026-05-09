@@ -12,7 +12,9 @@ interface IconProps {
 
 function a11y(p: IconProps): { "aria-hidden"?: "true"; "aria-label"?: string; role?: "img" } {
   if (p.ariaLabel) return { "aria-label": p.ariaLabel, role: "img" };
-  if (p.decorative === false) return {};
+  if (p.decorative === false && process.env.NODE_ENV !== "production") {
+    console.warn("[icons] icon flagged decorative={false} without an ariaLabel; falling back to aria-hidden");
+  }
   return { "aria-hidden": "true" };
 }
 
@@ -57,7 +59,7 @@ export const FramedPanel = ({
   style?: CSSProperties;
   className?: string;
 }) => (
-  <div className={`framed-panel ${className}`} style={{ position: "relative", ...style }}>
+  <div className={`framed-panel ${className}`} style={{ ...style, position: "relative" }}>
     <div className="framed-panel-inner">{children}</div>
     {ornaments && (
       <>

@@ -35,6 +35,8 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
 export default function Combobox({ options, value, onChange, placeholder, emptyLabel = "—", id }: Props) {
   const generatedId = useId();
   const buttonId = id ?? generatedId;
+  const listboxId = `${buttonId}-listbox`;
+  const optionId = (i: number) => `${buttonId}-option-${i}`;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [pos, setPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
@@ -107,6 +109,9 @@ export default function Combobox({ options, value, onChange, placeholder, emptyL
       e.preventDefault();
       const opt = filtered[highlighted];
       if (opt) choose(opt.value);
+    } else if (e.key === "Tab") {
+      // Don't trap focus — close the popover and let the browser advance focus.
+      setOpen(false);
     }
   };
 
@@ -131,28 +136,32 @@ export default function Combobox({ options, value, onChange, placeholder, emptyL
       {open &&
         typeof document !== "undefined" &&
         createPortal(
-          <div
-            ref={listRef}
-            className="combobox-popover"
-            style={{ top: pos.top, left: pos.left, minWidth: pos.width }}
-            role="listbox"
-          >
+          <div ref={listRef} className="combobox-popover" style={{ top: pos.top, left: pos.left, minWidth: pos.width }}>
             <input
               ref={inputRef}
               type="text"
               className="combobox-search"
               value={query}
               placeholder={placeholder ?? "Search…"}
+              role="combobox"
+              aria-controls={listboxId}
+              aria-expanded={open}
+              aria-autocomplete="list"
+              aria-activedescendant={filtered[highlighted] ? optionId(highlighted) : undefined}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onListKey}
             />
-            <div className="combobox-options">
+            <div id={listboxId} role="listbox" className="combobox-options">
               {filtered.length === 0 ? (
                 <div className="combobox-empty">No matches</div>
               ) : (
                 filtered.map((opt, i) => (
                   <button
-                    key={opt.value || `__${i}`}
+                    // Options have unique values within a single combobox; the empty-value
+                    // sentinel (e.g. "Default") collapses to a fixed key so it remains stable
+                    // across filtering even though no two options should ever both be empty.
+                    key={opt.value || "__empty"}
+                    id={optionId(i)}
                     type="button"
                     role="option"
                     aria-selected={opt.value === value}
