@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import {
   createSdkMcpServer,
   type Query,
@@ -53,6 +53,20 @@ const ASK_SYSTEM_PROMPT = [
   "result text. The built-in AskUserQuestion tool is disabled in this session — only",
   "use `mcp__vellum__ask` for shortlists.",
 ].join(" ");
+
+// Vellum's DM workflow expects the agent to read and edit campaign markdown
+// freely; the live-persistence rules in AGENTS.md mean every state change writes
+// to disk inline. Pre-approving every file-touching tool against `campaigns/**`
+// removes the per-call permission prompt while leaving every other path subject
+// to the normal Claude Code permission flow.
+const CAMPAIGN_TOOLS = ["Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep"] as const;
+
+function campaignAllowRules(cwd: string): string[] {
+  const abs = isAbsolute(cwd) ? join(cwd, "campaigns") : resolve(cwd, "campaigns");
+  // Triple the patterns so Claude's path matcher hits regardless of whether the
+  // tool input arrives as bare-relative, dot-relative, or absolute.
+  return CAMPAIGN_TOOLS.flatMap((t) => [`${t}(campaigns/**)`, `${t}(./campaigns/**)`, `${t}(${abs}/**)`]);
+}
 
 export function claudeAgent(spawn: AgentSpawn): Agent {
   let sessionId: string | undefined;
@@ -113,6 +127,11 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
       // without this it falls through to the permission prompt and is denied.
       allowedTools: ["mcp__vellum__ask"],
       disallowedTools: ["AskUserQuestion"],
+      settings: {
+        permissions: {
+          allow: campaignAllowRules(spawn.cwd),
+        },
+      },
       systemPrompt: { type: "preset", preset: "claude_code", append: ASK_SYSTEM_PROMPT },
       permissionMode: initialPermission,
       model: initialModel,

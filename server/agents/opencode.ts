@@ -111,7 +111,17 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
 
   async function boot() {
     try {
-      server = await createOpencodeServer({ hostname: "127.0.0.1", port: 0 });
+      server = await createOpencodeServer({
+        hostname: "127.0.0.1",
+        port: 0,
+        // Vellum's live-persistence model assumes the agent can write campaign
+        // markdown inline as the fiction unfolds. OpenCode's permission schema
+        // is global per tool category (no path scoping), so the closest match
+        // for "full read/write on campaigns/" is allowing edits everywhere.
+        // Bash stays at the default ("ask") because shell access is a wider
+        // blast radius than a markdown edit.
+        config: { permission: { edit: "allow" } },
+      });
       client = createOpencodeClient({ baseUrl: server.url });
       spawn.emit({ type: "ready", agent: "opencode" });
       void streamEvents();
