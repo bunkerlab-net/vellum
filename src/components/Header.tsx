@@ -10,6 +10,8 @@ interface Props {
   dayLabel: string | null;
   canSwitchCharacter: boolean;
   onSwitchCharacter: () => void;
+  canSaveGame: boolean;
+  onSaveGame: () => void;
 }
 
 export default function Header({
@@ -22,6 +24,8 @@ export default function Header({
   dayLabel,
   canSwitchCharacter,
   onSwitchCharacter,
+  canSaveGame,
+  onSaveGame,
 }: Props) {
   return (
     <header className="hdr">
@@ -59,6 +63,12 @@ export default function Header({
       </div>
 
       <div className="hdr-side hdr-side-right">
+        {canSaveGame && (
+          <button type="button" className="hdr-btn" onClick={onSaveGame} title="Save the session (runs /session-end)">
+            <Icon.Seal size={18} />
+            <span>Save Game</span>
+          </button>
+        )}
         {canSwitchCharacter && (
           <button type="button" className="hdr-btn" onClick={onSwitchCharacter} title="Switch character / campaign">
             <Icon.Scroll size={18} />

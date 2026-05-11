@@ -288,6 +288,11 @@ export default function App() {
     setThinking(true);
   };
 
+  const saveGame = () => {
+    send("/session-end");
+    setThinking(true);
+  };
+
   const beginSession = (campaign: string, character: string) => {
     setEntries([]);
     setTransientSession(false);
@@ -327,6 +332,8 @@ export default function App() {
           setCampaignsRefresh((n) => n + 1);
           clear();
         }}
+        canSaveGame={hasSelection}
+        onSaveGame={saveGame}
       />
 
       {errorBanner && (

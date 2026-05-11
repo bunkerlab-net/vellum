@@ -194,6 +194,19 @@ export const Icon = {
       />
     </svg>
   ),
+  Seal: (p: IconProps = {}) => (
+    <svg {...a11y(p)} width={p.size ?? 16} height={p.size ?? 16} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="10" r="6" stroke="currentColor" strokeWidth="1.3" fill="currentColor" fillOpacity="0.25" />
+      <path d="M9 9 L 12 13 L 15 9" stroke="currentColor" strokeWidth="1.3" fill="none" />
+      <path
+        d="M8 14 L 6 22 L 12 18 L 18 22 L 16 14"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        fill="currentColor"
+        fillOpacity="0.15"
+      />
+    </svg>
+  ),
   Gear: (p: IconProps = {}) => (
     <svg {...a11y(p)} width={p.size ?? 16} height={p.size ?? 16} viewBox="0 0 24 24" fill="none">
       <path

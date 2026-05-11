@@ -64,30 +64,7 @@ export default function CampaignPicker({ campaigns, onPick, onNewCampaign, onNew
       {active && (
         <div className="picker-step">
           <div className="picker-label">Choose a character</div>
-          {active.characters.length === 0 ? (
-            <div className="picker-stack">
-              <button
-                type="button"
-                className="picker-new-btn"
-                onClick={() => onNewCharacter(active.slug)}
-                title={`Roll up a new character for ${prettify(active.slug)} (runs /character-creation)`}
-              >
-                <span className="picker-new-mark">✦</span>
-                <span className="picker-new-text">Forge a new hero</span>
-                <span className="picker-new-meta">/character-creation</span>
-              </button>
-              <button
-                type="button"
-                className="picker-new-btn"
-                onClick={() => onPortCharacter(active.slug)}
-                title={`Bring an existing character into ${prettify(active.slug)} (runs /port-character)`}
-              >
-                <span className="picker-new-mark">⚜</span>
-                <span className="picker-new-text">Summon a hero from another chronicle</span>
-                <span className="picker-new-meta">/port-character</span>
-              </button>
-            </div>
-          ) : (
+          {active.characters.length > 0 && (
             <div className="picker-options">
               {active.characters.map((ch) => (
                 <button key={ch} type="button" className="picker-option" onClick={() => onPick(active.slug, ch)}>
@@ -97,6 +74,28 @@ export default function CampaignPicker({ campaigns, onPick, onNewCampaign, onNew
               ))}
             </div>
           )}
+          <div className="picker-stack">
+            <button
+              type="button"
+              className="picker-new-btn"
+              onClick={() => onNewCharacter(active.slug)}
+              title={`Roll up a new character for ${prettify(active.slug)} (runs /character-creation)`}
+            >
+              <span className="picker-new-mark">✦</span>
+              <span className="picker-new-text">Forge a new hero</span>
+              <span className="picker-new-meta">/character-creation</span>
+            </button>
+            <button
+              type="button"
+              className="picker-new-btn"
+              onClick={() => onPortCharacter(active.slug)}
+              title={`Bring an existing character into ${prettify(active.slug)} (runs /port-character)`}
+            >
+              <span className="picker-new-mark">⚜</span>
+              <span className="picker-new-text">Summon a hero from another chronicle</span>
+              <span className="picker-new-meta">/port-character</span>
+            </button>
+          </div>
         </div>
       )}
 
