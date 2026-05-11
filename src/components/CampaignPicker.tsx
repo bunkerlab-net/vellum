@@ -63,7 +63,9 @@ export default function CampaignPicker({ campaigns, onPick, onNewCampaign, onNew
 
       {active && (
         <div className="picker-step">
-          <div className="picker-label">Choose a character</div>
+          <div className="picker-label">
+            {active.characters.length > 0 ? "Choose a character" : "No heroes yet in this chronicle"}
+          </div>
           {active.characters.length > 0 && (
             <div className="picker-options">
               {active.characters.map((ch) => (
