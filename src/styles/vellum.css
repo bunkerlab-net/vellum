@@ -2208,9 +2208,6 @@ button {
   flex-direction: column;
   gap: 8px;
 }
-.picker-stack .picker-new-btn {
-  margin-top: 0;
-}
 .picker-new-btn {
   display: flex;
   align-items: center;
@@ -2230,6 +2227,9 @@ button {
   border-style: solid;
   border-color: var(--gold-bright);
   background: rgba(201, 169, 97, 0.15);
+}
+.picker-stack .picker-new-btn {
+  margin-top: 0;
 }
 .picker-new-mark {
   color: var(--gold-bright);

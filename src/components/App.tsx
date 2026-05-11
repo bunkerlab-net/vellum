@@ -30,6 +30,8 @@ export default function App() {
   const [transientSession, setTransientSession] = useState(false);
   const idCounter = useRef(100);
   const partialEntryId = useRef<number | null>(null);
+  const sendRef = useRef<(text: string) => void>(() => {});
+  const pendingBootstrapRef = useRef<string | null>(null);
 
   const nextId = useCallback(() => ++idCounter.current, []);
 
@@ -44,6 +46,11 @@ export default function App() {
           if (typeof msg.model === "string") setModelState(msg.model);
           if (typeof msg.effort === "string") setEffortState(msg.effort);
           setErrorBanner(null);
+          if (pendingBootstrapRef.current) {
+            const text = pendingBootstrapRef.current;
+            pendingBootstrapRef.current = null;
+            sendRef.current(text);
+          }
           break;
         case "permission_mode":
           setPermissionModeState(msg.mode);
@@ -120,7 +127,7 @@ export default function App() {
         case "restart":
           setEntries([]);
           partialEntryId.current = null;
-          setThinking(false);
+          if (!pendingBootstrapRef.current) setThinking(false);
           setErrorBanner(null);
           break;
         case "tool_result":
@@ -131,11 +138,15 @@ export default function App() {
           break;
         case "error":
           setErrorBanner(msg.message);
-          if (msg.fatal) setThinking(false);
+          if (msg.fatal) {
+            setThinking(false);
+            pendingBootstrapRef.current = null;
+          }
           break;
         case "agent_exit":
           setThinking(false);
           setErrorBanner((b) => b ?? "Agent exited. Click Restart to respawn.");
+          pendingBootstrapRef.current = null;
           break;
       }
     },
@@ -144,6 +155,7 @@ export default function App() {
 
   const { state, send, sendToolReply, setPermissionMode, setModel, setEffort, interrupt, restart } =
     useTransport(handleMessage);
+  sendRef.current = send;
 
   const submitAskAnswers = (toolUseId: string, questions: AskQuestion[], answers: (string[] | null)[]) => {
     const lines = questions.map((q, i) => {
@@ -267,25 +279,33 @@ export default function App() {
   const hasSelection = selection.campaign != null && selection.character != null;
   const showChat = hasSelection || transientSession;
 
+  // Every flow boundary (entering a campaign, leaving back to the picker, or
+  // starting a transient wizard) must reset the agent — otherwise the SDK's
+  // conversation history bleeds context from the previous flow into the next.
+  // The agent restart is async on the server (close → respawn → ready), so we
+  // queue the bootstrap prompt in `pendingBootstrapRef` and the `ready` handler
+  // drains it once the fresh agent reports in.
+  const restartAndSend = (text: string) => {
+    setEntries([]);
+    partialEntryId.current = null;
+    pendingBootstrapRef.current = text;
+    setThinking(true);
+    restart();
+  };
+
   const startNewCampaign = () => {
     setTransientSession(true);
-    setEntries([]);
-    send("/campaign-creation");
-    setThinking(true);
+    restartAndSend("/campaign-creation");
   };
 
   const startNewCharacter = (campaign: string) => {
     setTransientSession(true);
-    setEntries([]);
-    send(`/character-creation for the ${campaign} campaign`);
-    setThinking(true);
+    restartAndSend(`/character-creation for the ${campaign} campaign`);
   };
 
   const startPortCharacter = (campaign: string) => {
     setTransientSession(true);
-    setEntries([]);
-    send(`/port-character into the ${campaign} campaign`);
-    setThinking(true);
+    restartAndSend(`/port-character into the ${campaign} campaign`);
   };
 
   const saveGame = () => {
@@ -294,11 +314,9 @@ export default function App() {
   };
 
   const beginSession = (campaign: string, character: string) => {
-    setEntries([]);
     setTransientSession(false);
     choose(campaign, character);
-    send(`Give a summary of the events so far in ${campaign} for character ${character}.`);
-    setThinking(true);
+    restartAndSend(`Give a summary of the events so far in ${campaign} for character ${character}.`);
   };
   const playerName = character?.name ?? "You";
   const location = hasSelection ? (character?.location ?? "Somewhere in the world") : "";
@@ -331,6 +349,10 @@ export default function App() {
           setTransientSession(false);
           setCampaignsRefresh((n) => n + 1);
           clear();
+          // Reset the agent on the way back to the picker so the picker view
+          // itself starts from a clean session — defence in depth alongside the
+          // entry-side restart in beginSession / startNewCampaign / etc.
+          restart();
         }}
         canSaveGame={hasSelection}
         onSaveGame={saveGame}
