@@ -270,12 +270,16 @@ button {
   top: -4px;
   right: -4px;
 }
+/* Bottom corners are flipped via `transform: scaleY(-1)`, which shifts the
+   rendered content several pixels above where the un-flipped origin math
+   would predict. The extra negative `bottom` offset is empirically tuned
+   to land the L-bracket's elbow on the panel corner. Don't symmetrize. */
 .story-frame-corner.bl {
-  bottom: -4px;
+  bottom: -10px;
   left: -4px;
 }
 .story-frame-corner.br {
-  bottom: -4px;
+  bottom: -10px;
   right: -4px;
 }
 
