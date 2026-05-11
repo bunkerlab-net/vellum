@@ -117,9 +117,16 @@ Use the templates below. Fill in everything captured during the interview.
 
 Every file written must follow the **File Conventions** in `AGENTS.md` (final newline, LF, UTF-8, no trailing whitespace).
 
-## 10. Confirm
+## 10. Confirm & onboard a character
 
-Read back a tight summary: setting, tone, difficulty (call out Hardcore explicitly if selected, including the lock), premise, starting region, factions, the headline house rules. Ask if the player wants to adjust anything. Apply edits, save, end the skill. Suggest `/character-creation` as the next step if no PC exists yet.
+Read back a tight summary: setting, tone, difficulty (call out Hardcore explicitly if selected, including the lock), premise, starting region, factions, the headline house rules. Ask if the player wants to adjust anything. Apply edits and save.
+
+Before ending the skill, call **`AskUserQuestion`** (one question, two options) so the player can pick how to bring a character into the new campaign:
+
+- **Create a new character** — run `/character-creation` against this campaign.
+- **Import an existing character** — run `/port-character` to bring a PC over from another campaign.
+
+The auto-provided "Other" entry is the player's escape hatch (defer / something else). Do **not** enumerate these choices in prose — `AskUserQuestion` already covers that surface. Hand off into the chosen skill immediately on selection; on "Other", honor whatever the player wrote in.
 
 ---
 
