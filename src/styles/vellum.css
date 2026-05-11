@@ -2203,6 +2203,14 @@ button {
   border: 1px solid rgba(201, 169, 97, 0.2);
 }
 
+.picker-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.picker-stack .picker-new-btn {
+  margin-top: 0;
+}
 .picker-new-btn {
   display: flex;
   align-items: center;

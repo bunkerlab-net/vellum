@@ -5,9 +5,11 @@ interface Props {
   campaigns: CampaignListing[];
   onPick: (campaign: string, character: string) => void;
   onNewCampaign: () => void;
+  onNewCharacter: (campaign: string) => void;
+  onPortCharacter: (campaign: string) => void;
 }
 
-export default function CampaignPicker({ campaigns, onPick, onNewCampaign }: Props) {
+export default function CampaignPicker({ campaigns, onPick, onNewCampaign, onNewCharacter, onPortCharacter }: Props) {
   const [campaign, setCampaign] = useState<string | null>(null);
 
   const newButton = (
@@ -63,10 +65,28 @@ export default function CampaignPicker({ campaigns, onPick, onNewCampaign }: Pro
         <div className="picker-step">
           <div className="picker-label">Choose a character</div>
           {active.characters.length === 0 ? (
-            <p className="picker-hint">
-              No characters yet in <code>{active.slug}</code>. Run the <code>character-creation</code> skill to roll one
-              up.
-            </p>
+            <div className="picker-stack">
+              <button
+                type="button"
+                className="picker-new-btn"
+                onClick={() => onNewCharacter(active.slug)}
+                title={`Roll up a new character for ${prettify(active.slug)} (runs /character-creation)`}
+              >
+                <span className="picker-new-mark">✦</span>
+                <span className="picker-new-text">Forge a new hero</span>
+                <span className="picker-new-meta">/character-creation</span>
+              </button>
+              <button
+                type="button"
+                className="picker-new-btn"
+                onClick={() => onPortCharacter(active.slug)}
+                title={`Bring an existing character into ${prettify(active.slug)} (runs /port-character)`}
+              >
+                <span className="picker-new-mark">⚜</span>
+                <span className="picker-new-text">Summon a hero from another chronicle</span>
+                <span className="picker-new-meta">/port-character</span>
+              </button>
+            </div>
           ) : (
             <div className="picker-options">
               {active.characters.map((ch) => (

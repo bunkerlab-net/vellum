@@ -274,6 +274,20 @@ export default function App() {
     setThinking(true);
   };
 
+  const startNewCharacter = (campaign: string) => {
+    setTransientSession(true);
+    setEntries([]);
+    send(`/character-creation for the ${campaign} campaign`);
+    setThinking(true);
+  };
+
+  const startPortCharacter = (campaign: string) => {
+    setTransientSession(true);
+    setEntries([]);
+    send(`/port-character into the ${campaign} campaign`);
+    setThinking(true);
+  };
+
   const beginSession = (campaign: string, character: string) => {
     setEntries([]);
     setTransientSession(false);
@@ -349,7 +363,13 @@ export default function App() {
                 onAskSubmit={handleAskSubmit}
               />
             ) : (
-              <CampaignPicker campaigns={campaigns} onPick={beginSession} onNewCampaign={startNewCampaign} />
+              <CampaignPicker
+                campaigns={campaigns}
+                onPick={beginSession}
+                onNewCampaign={startNewCampaign}
+                onNewCharacter={startNewCharacter}
+                onPortCharacter={startPortCharacter}
+              />
             )}
             {showChat && thinking && (
               <div className="thinking-row">
