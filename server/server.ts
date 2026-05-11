@@ -395,6 +395,23 @@ export async function startServer(opts: StartOptions) {
             respawnAttempts = 0;
             lastSessionId = undefined;
             spawnAgent();
+            // Claude's SDK defers `system.init` (and therefore its `ready`
+            // event) until the prompt iterator yields its first item. With
+            // the frontend queueing its bootstrap prompt until a `ready`
+            // arrives, that creates a deadlock: no ready without a prompt,
+            // no prompt without a ready. Mirror the hello-time synthetic
+            // ready here so the new agent looks "open for prompts" right
+            // away. OpenCode and Codex emit their own ready shortly after
+            // spawn — this extra event is harmless there.
+            if (agent) {
+              emit({
+                type: "ready",
+                agent: opts.agentName,
+                permissionMode,
+                model,
+                effort,
+              });
+            }
           })().catch((err) => {
             emit({
               type: "error",
