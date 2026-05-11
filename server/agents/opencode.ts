@@ -1,4 +1,5 @@
-import { createOpencodeClient, createOpencodeServer, type Event, type Part } from "@opencode-ai/sdk";
+import { isAbsolute, resolve, sep } from "node:path";
+import { createOpencodeClient, createOpencodeServer, type Event, type Part, type Permission } from "@opencode-ai/sdk";
 import type { Agent, AgentSpawn } from "./types";
 
 type OpencodeServer = Awaited<ReturnType<typeof createOpencodeServer>>;
@@ -54,6 +55,7 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
   const seenTextEnd = new BoundedSet<string>(DEDUP_CAP);
   let queued: Promise<void> = Promise.resolve();
   let currentModel: ParsedModel | undefined = parseModel(spawn.model);
+  const campaignsDir = resolve(spawn.cwd, "campaigns");
 
   const ready = boot();
 
@@ -114,13 +116,15 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
       server = await createOpencodeServer({
         hostname: "127.0.0.1",
         port: 0,
-        // Vellum's live-persistence model assumes the agent can write campaign
-        // markdown inline as the fiction unfolds. OpenCode's permission schema
-        // is global per tool category (no path scoping), so the closest match
-        // for "full read/write on campaigns/" is allowing edits everywhere.
-        // Bash stays at the default ("ask") because shell access is a wider
-        // blast radius than a markdown edit.
-        config: { permission: { edit: "allow" } },
+        // OpenCode's typed permission schema is global per tool category — it
+        // can't express "allow edits only under campaigns/". Routing `edit`
+        // through "ask" lets us subscribe to the `permission.updated` event
+        // and reply per-request: approve when every path lands under
+        // `campaigns/`, reject otherwise. See `respondToPermission` below.
+        // Other tool categories keep their SDK defaults so we don't widen the
+        // surface or break flows (e.g. `mise run roll` via bash) that already
+        // rely on the unchanged defaults.
+        config: { permission: { edit: "ask" } },
       });
       client = createOpencodeClient({ baseUrl: server.url });
       spawn.emit({ type: "ready", agent: "opencode" });
@@ -175,7 +179,12 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
         attempts = 0;
         for await (const event of result.stream) {
           if (closing) return;
-          handleEvent(event as Event, spawn, seenTool, seenTextEnd);
+          const ev = event as Event;
+          if (ev.type === "permission.updated") {
+            void respondToPermission(ev.properties);
+            continue;
+          }
+          handleEvent(ev, spawn, seenTool, seenTextEnd);
         }
       } catch (err) {
         if (closing) return;
@@ -194,6 +203,40 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
         await sleep(delay);
       }
     }
+  }
+
+  async function respondToPermission(p: Permission) {
+    if (!client) return;
+    const allow = p.type === "edit" && allPathsInCampaigns(p.pattern);
+    try {
+      await client.postSessionIdPermissionsPermissionId({
+        path: { id: p.sessionID, permissionID: p.id },
+        body: { response: allow ? "once" : "reject" },
+      });
+      if (!allow) {
+        process.stderr.write(
+          `[opencode] rejected ${p.type} permission outside campaigns/ (pattern=${JSON.stringify(p.pattern)})\n`,
+        );
+      }
+    } catch (err) {
+      process.stderr.write(`[opencode] permission respond failed: ${errMsg(err)}\n`);
+    }
+  }
+
+  function allPathsInCampaigns(pattern: Permission["pattern"]): boolean {
+    if (pattern == null) return false;
+    const list = Array.isArray(pattern) ? pattern : [pattern];
+    if (list.length === 0) return false;
+    return list.every(pathInCampaigns);
+  }
+
+  function pathInCampaigns(p: unknown): boolean {
+    if (typeof p !== "string" || p.length === 0) return false;
+    // Globs would slip through `startsWith` (e.g. `*` in the middle of an
+    // otherwise campaigns-rooted path). Concrete file paths only.
+    if (/[*?[\]]/.test(p)) return false;
+    const abs = isAbsolute(p) ? p : resolve(spawn.cwd, p);
+    return abs === campaignsDir || abs.startsWith(campaignsDir + sep);
   }
 }
 
