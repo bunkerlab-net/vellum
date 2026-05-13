@@ -6,6 +6,7 @@ import {
   type ThreadItem,
   type ThreadOptions,
 } from "@openai/codex-sdk";
+import { log } from "../log";
 import type { Agent, AgentSpawn } from "./types";
 
 const EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh"] as const;
@@ -127,6 +128,7 @@ export function codexAgent(spawn: AgentSpawn): Agent {
       activeAbort?.abort();
     },
     async close() {
+      log.debug("codex", "close");
       closing = true;
       activeAbort?.abort();
     },
@@ -145,6 +147,7 @@ export function codexAgent(spawn: AgentSpawn): Agent {
       }
     } catch (err) {
       if (closing) return;
+      log.error("codex", `turn failed: ${errMsg(err)}`);
       spawn.emit({ type: "error", message: `codex turn failed: ${errMsg(err)}` });
     } finally {
       if (activeAbort === abort) activeAbort = null;
@@ -160,6 +163,7 @@ function handleEvent(
   captureSession: (id: string) => void,
 ) {
   if (event.type === "thread.started") {
+    log.info("codex", `thread.started id=${event.thread_id.slice(0, 8)}`);
     captureSession(event.thread_id);
     return;
   }

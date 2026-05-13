@@ -5,6 +5,7 @@ import type { ServerWebSocket } from "bun";
 import type { Agent, ClientMsg, ServerMsg, ServerMsgIn } from "./agents/index";
 import { agents } from "./agents/index";
 import { listCampaigns, loadCharacter } from "./character";
+import { log, truncate } from "./log";
 
 export type PermissionMode = "default" | "acceptEdits";
 const PERMISSION_MODES: PermissionMode[] = ["default", "acceptEdits"];
@@ -118,12 +119,17 @@ export async function startServer(opts: StartOptions) {
         effort = msg.effort as Effort | "";
       }
       respawnAttempts = 0;
+      log.info("agent", `ready session=${msg.sessionId ?? "?"} model=${msg.model ?? model ?? "?"}`);
+    }
+    if (msg.type === "error") {
+      log.warn("agent", `${msg.fatal ? "fatal " : ""}error: ${truncate(msg.message, 200)}`);
     }
     if (msg.type === "agent_exit") {
       const wasInterrupted = interruptArmed;
       interruptArmed = false;
       if (wasInterrupted && lastSessionId && respawnAttempts < MAX_RAPID_RESPAWNS) {
         respawnAttempts++;
+        log.info("agent", `auto-respawn after interrupt (attempt ${respawnAttempts}/${MAX_RAPID_RESPAWNS})`);
         // Suppress visible agent_exit, transparently respawn with resume
         pendingRespawn = setTimeout(() => {
           pendingRespawn = null;
@@ -131,11 +137,18 @@ export async function startServer(opts: StartOptions) {
         }, 50);
         return;
       }
+      log.info("agent", `exit code=${msg.code ?? "null"}`);
     }
     emit(msg);
   };
 
   const spawnAgent = (resumeId?: string) => {
+    log.info(
+      "agent",
+      `spawn ${opts.agentName}${resumeId ? ` resume=${resumeId.slice(0, 8)}` : ""}${
+        model ? ` model=${model}` : ""
+      }${effort ? ` effort=${effort}` : ""} permission=${permissionMode}`,
+    );
     const factory = opts.agentName in agents ? agents[opts.agentName as keyof typeof agents] : agents.claude;
     try {
       agent = factory({
@@ -148,6 +161,7 @@ export async function startServer(opts: StartOptions) {
         resume: resumeId,
       });
     } catch (err) {
+      log.error("agent", `spawn failed: ${errorMessage(err)}`);
       emit({
         type: "error",
         message: `Failed to spawn ${opts.agentName}: ${errorMessage(err)}`,
@@ -264,9 +278,11 @@ export async function startServer(opts: StartOptions) {
     websocket: {
       open(ws) {
         clients.add(ws);
+        log.info("ws", `client #${ws.data.id} connected (${clients.size} total)`);
       },
       close(ws) {
         clients.delete(ws);
+        log.info("ws", `client #${ws.data.id} disconnected (${clients.size} remaining)`);
       },
       message(ws, raw) {
         let msg: ClientMsg;
@@ -296,8 +312,14 @@ export async function startServer(opts: StartOptions) {
         }
 
         if (msg.type === "user_input") {
+          // Confirm the event at info level; gate the actual text behind debug
+          // so logs shared in bug reports do not carry whatever the player
+          // typed (e.g. a stray pasted token).
+          log.info("ws", `client #${ws.data.id} user_input (len=${msg.text.length})`);
+          log.debug("ws", `client #${ws.data.id} user_input: ${truncate(msg.text)}`);
           emit({ type: "user_echo", text: msg.text });
           agent?.send(msg.text).catch((err) => {
+            log.error("agent", `send failed: ${errorMessage(err)}`);
             emit({
               type: "error",
               message: `send failed: ${errorMessage(err)}`,
@@ -383,6 +405,7 @@ export async function startServer(opts: StartOptions) {
         }
 
         if (msg.type === "restart") {
+          log.info("ws", `client #${ws.data.id} restart requested`);
           (async () => {
             // Cancel any pending auto-respawn so it can't race with the explicit restart.
             if (pendingRespawn !== null) {
@@ -390,6 +413,7 @@ export async function startServer(opts: StartOptions) {
               pendingRespawn = null;
             }
             emit({ type: "restart", agent: opts.agentName });
+            log.info("agent", "closing for restart");
             await agent?.close();
             agent = null;
             ring.length = 0;
@@ -414,6 +438,7 @@ export async function startServer(opts: StartOptions) {
               });
             }
           })().catch((err) => {
+            log.error("agent", `restart failed: ${errorMessage(err)}`);
             emit({
               type: "error",
               message: `restart failed: ${errorMessage(err)}`,
@@ -432,7 +457,7 @@ export async function startServer(opts: StartOptions) {
   });
 
   const url = `http://localhost:${port}`;
-  console.log(`Vellum is listening at ${url}  (agent: ${opts.agentName})`);
+  log.info("server", `listening at ${url} agent=${opts.agentName}${model ? ` model=${model}` : ""} cwd=${opts.cwd}`);
   openInBrowser(url);
 
   return server;

@@ -10,6 +10,7 @@ import {
   tool,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { log } from "../log";
 import type { Agent, AgentSpawn, EmitFn } from "./types";
 
 type PermissionMode = "default" | "acceptEdits";
@@ -162,7 +163,7 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
     async sendToolReply(toolUseId: string, content: string) {
       const resolve = pending.get(toolUseId);
       if (!resolve) {
-        process.stderr.write(`[claude] no pending ask for toolUseId=${toolUseId}\n`);
+        log.warn("claude", `no pending ask for toolUseId=${toolUseId}`);
         return;
       }
       pending.delete(toolUseId);
@@ -170,25 +171,25 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
     },
     async setModel(model: string) {
       await q.setModel(model.length > 0 ? model : undefined).catch((err) => {
-        process.stderr.write(`[claude] setModel failed: ${errMsg(err)}\n`);
+        log.warn("claude", `setModel failed: ${errMsg(err)}`);
       });
     },
     async setEffort(effort: string) {
       if (!isEffort(effort)) {
-        process.stderr.write(`[claude] ignoring unknown effort: ${effort}\n`);
+        log.warn("claude", `ignoring unknown effort: ${effort}`);
         return;
       }
       await q.applyFlagSettings({ effortLevel: effort }).catch((err) => {
-        process.stderr.write(`[claude] setEffort failed: ${errMsg(err)}\n`);
+        log.warn("claude", `setEffort failed: ${errMsg(err)}`);
       });
     },
     async setPermissionMode(mode: string) {
       if (!isPermissionMode(mode)) {
-        process.stderr.write(`[claude] ignoring unknown permission mode: ${mode}\n`);
+        log.warn("claude", `ignoring unknown permission mode: ${mode}`);
         return;
       }
       await q.setPermissionMode(mode).catch((err) => {
-        process.stderr.write(`[claude] setPermissionMode failed: ${errMsg(err)}\n`);
+        log.warn("claude", `setPermissionMode failed: ${errMsg(err)}`);
       });
     },
     async listModels() {
@@ -196,16 +197,17 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
         const models = await q.supportedModels();
         return models.map((m) => ({ value: m.value, label: m.displayName }));
       } catch (err) {
-        process.stderr.write(`[claude] supportedModels failed: ${errMsg(err)}\n`);
+        log.warn("claude", `supportedModels failed: ${errMsg(err)}`);
         return [];
       }
     },
     interrupt() {
       void q.interrupt().catch((err) => {
-        process.stderr.write(`[claude] interrupt failed: ${errMsg(err)}\n`);
+        log.warn("claude", `interrupt failed: ${errMsg(err)}`);
       });
     },
     async close() {
+      log.debug("claude", "close");
       closing = true;
       for (const [id, resolve] of pending) {
         pending.delete(id);
@@ -224,13 +226,23 @@ async function consume(
   isClosing: () => boolean,
   initialEffort: EffortLevel | undefined,
 ) {
+  log.debug("claude", "consume loop started");
   try {
     for await (const msg of q) {
       handleSdkMessage(msg, spawn.emit, captureSession, initialEffort);
     }
-    if (!isClosing()) spawn.emit({ type: "agent_exit", code: 0 });
+    if (!isClosing()) {
+      log.warn("claude", "consume loop ended unexpectedly (no closing flag set)");
+      spawn.emit({ type: "agent_exit", code: 0 });
+    } else {
+      log.debug("claude", "consume loop ended after close");
+    }
   } catch (err) {
-    if (isClosing()) return;
+    if (isClosing()) {
+      log.debug("claude", `consume loop aborted after close: ${errMsg(err)}`);
+      return;
+    }
+    log.error("claude", `consume loop threw: ${errMsg(err)}`);
     spawn.emit({ type: "error", message: errMsg(err), fatal: true });
     spawn.emit({ type: "agent_exit", code: null });
   }
@@ -244,6 +256,7 @@ function handleSdkMessage(
 ) {
   if (msg.type === "system" && msg.subtype === "init") {
     captureSession(msg.session_id);
+    log.info("claude", `system.init session=${msg.session_id.slice(0, 8)} model=${msg.model}`);
     emit({
       type: "ready",
       agent: "claude",

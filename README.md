@@ -57,6 +57,20 @@ bun start -- opencode --model anthropic/claude-... # OpenCode wants a provider/m
 bun start -- codex --model gpt-5                   # Codex (supported but untested locally)
 ```
 
+### Debug logging
+
+The Bun server emits structured `HH:MM:SS.mmm LEVEL [tag] message` lines for agent lifecycle, WebSocket activity, and
+errors. Set `VELLUM_LOG` to widen or narrow what's printed:
+
+```bash
+VELLUM_LOG=debug bun start             # verbose: includes per-agent debug events
+VELLUM_LOG=warn  bun start             # quiet: warnings and errors only
+```
+
+Default is `info`. Info-and-above goes to stdout; warn/error go to stderr, so you can pipe them separately if needed.
+
+### Agents and SDKs
+
 The default agent is **Claude Code** via the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview).
 **OpenCode** (via the [`@opencode-ai/sdk`](https://opencode.ai/docs/sdk/)) is fully supported. **Codex** (via
 [`@openai/codex-sdk`](https://github.com/openai/codex)) is wired up against the SDK but currently **untested** —

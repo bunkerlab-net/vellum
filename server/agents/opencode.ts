@@ -1,5 +1,6 @@
 import { isAbsolute, resolve, sep } from "node:path";
 import { createOpencodeClient, createOpencodeServer, type Event, type Part, type Permission } from "@opencode-ai/sdk";
+import { log } from "../log";
 import type { Agent, AgentSpawn } from "./types";
 
 type OpencodeServer = Awaited<ReturnType<typeof createOpencodeServer>>;
@@ -89,7 +90,7 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
         out.sort((a, b) => a.label.localeCompare(b.label));
         return out;
       } catch (err) {
-        process.stderr.write(`[opencode] provider.list failed: ${errMsg(err)}\n`);
+        log.warn("opencode", `provider.list failed: ${errMsg(err)}`);
         return [];
       }
     },
@@ -97,9 +98,10 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
       if (!client || !sessionId) return;
       void client.session
         .abort({ path: { id: sessionId } })
-        .catch((err) => process.stderr.write(`[opencode] abort failed: ${errMsg(err)}\n`));
+        .catch((err) => log.warn("opencode", `abort failed: ${errMsg(err)}`));
     },
     async close() {
+      log.debug("opencode", "close");
       closing = true;
       eventAbort.abort();
       try {
@@ -127,9 +129,11 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
         config: { permission: { edit: "ask" } },
       });
       client = createOpencodeClient({ baseUrl: server.url });
+      log.info("opencode", `server booted at ${server.url}`);
       spawn.emit({ type: "ready", agent: "opencode" });
       void streamEvents();
     } catch (err) {
+      log.error("opencode", `boot failed: ${errMsg(err)}`);
       spawn.emit({ type: "error", message: `opencode boot failed: ${errMsg(err)}`, fatal: true });
       spawn.emit({ type: "agent_exit", code: null });
       throw err;
@@ -163,6 +167,7 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
       });
     } catch (err) {
       if (closing) return;
+      log.error("opencode", `prompt failed: ${errMsg(err)}`);
       spawn.emit({ type: "error", message: `opencode prompt failed: ${errMsg(err)}` });
     }
   }
@@ -189,7 +194,7 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
       } catch (err) {
         if (closing) return;
         attempts++;
-        process.stderr.write(`[opencode] event stream error (attempt ${attempts}): ${errMsg(err)}\n`);
+        log.warn("opencode", `event stream error (attempt ${attempts}): ${errMsg(err)}`);
         if (attempts >= STREAM_MAX_RETRIES) {
           spawn.emit({
             type: "error",
@@ -214,12 +219,10 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
         body: { response: allow ? "once" : "reject" },
       });
       if (!allow) {
-        process.stderr.write(
-          `[opencode] rejected ${p.type} permission outside campaigns/ (pattern=${JSON.stringify(p.pattern)})\n`,
-        );
+        log.warn("opencode", `rejected ${p.type} permission outside campaigns/ (pattern=${JSON.stringify(p.pattern)})`);
       }
     } catch (err) {
-      process.stderr.write(`[opencode] permission respond failed: ${errMsg(err)}\n`);
+      log.warn("opencode", `permission respond failed: ${errMsg(err)}`);
     }
   }
 
