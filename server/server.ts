@@ -61,6 +61,7 @@ interface StartOptions {
   cwd: string;
   distDir: string;
   campaignsDir: string;
+  model?: string;
 }
 
 interface SocketData {
@@ -72,7 +73,7 @@ export async function startServer(opts: StartOptions) {
   let seq = 0;
   let agent: Agent | null = null;
   let permissionMode: PermissionMode = "default";
-  let model = "";
+  let model = opts.model ?? "";
   let effort: Effort | "" = "";
   let lastSessionId: string | undefined;
   let interruptArmed = false;

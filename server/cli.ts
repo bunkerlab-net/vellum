@@ -11,11 +11,31 @@ const raw = Bun.argv.slice(2);
 const flags = new Set<string>();
 const passthrough: string[] = [];
 let agentName: string | null = null;
+let model = "";
 
 for (let i = 0; i < raw.length; i++) {
   const arg = raw[i];
   if (arg === "--no-build" || arg === "--no-open") {
     flags.add(arg);
+    continue;
+  }
+  if (arg === "--model") {
+    const value = raw[i + 1];
+    if (!value || value.startsWith("-")) {
+      console.error("--model requires a value (e.g. --model opus)");
+      process.exit(1);
+    }
+    model = value;
+    i++;
+    continue;
+  }
+  if (arg.startsWith("--model=")) {
+    const value = arg.slice("--model=".length);
+    if (!value) {
+      console.error("--model= requires a value (e.g. --model=opus)");
+      process.exit(1);
+    }
+    model = value;
     continue;
   }
   if (agentName == null && !arg.startsWith("-") && arg in agents) {
@@ -56,6 +76,7 @@ await startServer({
   cwd: projectRoot,
   distDir,
   campaignsDir,
+  model: model || undefined,
 });
 
 function distNeedsRebuild(root: string, out: string): boolean {

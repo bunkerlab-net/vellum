@@ -45,14 +45,16 @@ the header to switch palette / fonts / story-mode / model / effort / permission 
 
 ### Choosing an agent
 
-Anything after `--` is forwarded to the agent's CLI verbatim:
+The first non-flag argument after `--` picks the agent. `--model <value>` is recognised by the wrapper and forwarded
+to whichever agent SDK is in use; everything else is passed through to the agent CLI verbatim.
 
 ```bash
 bun start                                          # default: Claude Code
+bun start -- claude --model opus                   # Claude with a model alias (sonnet / haiku / full id also work)
 bun start -- claude --resume hollow-king-antonidus # Claude with extra CLI flags
 bun start -- opencode                              # OpenCode (passes through the OpenCode SDK)
-bun start -- opencode --model anthropic/claude-...  # OpenCode with provider/model override
-bun start -- codex                                 # Codex (supported but untested locally)
+bun start -- opencode --model anthropic/claude-... # OpenCode wants a provider/model id
+bun start -- codex --model gpt-5                   # Codex (supported but untested locally)
 ```
 
 The default agent is **Claude Code** via the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview).
