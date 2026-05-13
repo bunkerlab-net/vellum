@@ -9,7 +9,7 @@ npm.package_manager = "bun"
 
 biome = "2"
 bun = "1"
-hk = "1.44.3"
+hk = "1.45.0"
 node = "24"
 pkl = "0.31"
 usage = "latest"
