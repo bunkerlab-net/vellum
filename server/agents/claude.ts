@@ -3,10 +3,11 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import {
   createSdkMcpServer,
+  type Options,
   type Query,
-  query,
   type SDKMessage,
   type SDKUserMessage,
+  startup,
   tool,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -117,37 +118,67 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
     tools: [askTool],
   });
 
-  const q: Query = query({
-    prompt: inbox.iterable,
-    options: {
-      cwd: spawn.cwd,
-      abortController: abort,
-      includePartialMessages: true,
-      mcpServers: { vellum: mcp },
-      // We host the picker ourselves, so the SDK MCP tool is always trusted —
-      // without this it falls through to the permission prompt and is denied.
-      allowedTools: ["mcp__vellum__ask"],
-      disallowedTools: ["AskUserQuestion"],
-      settings: {
-        permissions: {
-          allow: campaignAllowRules(spawn.cwd),
-        },
+  const queryOptions: Options = {
+    cwd: spawn.cwd,
+    abortController: abort,
+    includePartialMessages: true,
+    mcpServers: { vellum: mcp },
+    // We host the picker ourselves, so the SDK MCP tool is always trusted —
+    // without this it falls through to the permission prompt and is denied.
+    allowedTools: ["mcp__vellum__ask"],
+    disallowedTools: ["AskUserQuestion"],
+    settings: {
+      permissions: {
+        allow: campaignAllowRules(spawn.cwd),
       },
-      systemPrompt: { type: "preset", preset: "claude_code", append: ASK_SYSTEM_PROMPT },
-      permissionMode: initialPermission,
-      model: initialModel,
-      effort: initialEffort,
-      resume: spawn.resume,
     },
-  });
+    systemPrompt: { type: "preset", preset: "claude_code", append: ASK_SYSTEM_PROMPT },
+    permissionMode: initialPermission,
+    model: initialModel,
+    effort: initialEffort,
+    resume: spawn.resume,
+  };
 
-  void consume(
-    q,
-    spawn,
-    (id) => (sessionId = id),
-    () => closing,
-    initialEffort,
-  );
+  // The SDK's `query()` defers `system.init` until the prompt iterator
+  // yields its first item, which used to deadlock the frontend's
+  // restart→bootstrap flow (no ready without a prompt, no prompt without a
+  // ready). `startup()` runs the init handshake up front and gives us a
+  // handle whose `.query()` attaches our iterator to a subprocess that's
+  // already warm. We emit `ready` as soon as that resolves so the host can
+  // start sending immediately — matching OpenCode and Codex semantics. A
+  // second `ready` (with the real `session_id`) still flows through
+  // `handleSdkMessage` once the SDK yields `system.init` on the first
+  // prompt.
+  const queryReady: Promise<Query> = (async () => {
+    const warm = await startup({ options: queryOptions });
+    if (closing) {
+      warm.close();
+      throw new Error("agent closed before warm-up completed");
+    }
+    const next = warm.query(inbox.iterable);
+    log.info("claude", "warm subprocess attached");
+    spawn.emit({
+      type: "ready",
+      agent: "claude",
+      model: initialModel,
+      permissionMode: initialPermission,
+      effort: initialEffort,
+    });
+    void consume(
+      next,
+      spawn,
+      (id) => (sessionId = id),
+      () => closing,
+      initialEffort,
+    );
+    return next;
+  })();
+  queryReady.catch((err) => {
+    if (closing) return;
+    log.error("claude", `startup failed: ${errMsg(err)}`);
+    spawn.emit({ type: "error", message: errMsg(err), fatal: true });
+    spawn.emit({ type: "agent_exit", code: null });
+  });
 
   return {
     get sessionId() {
@@ -170,6 +201,8 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
       resolve(content);
     },
     async setModel(model: string) {
+      const q = await waitForQuery();
+      if (!q) return;
       await q.setModel(model.length > 0 ? model : undefined).catch((err) => {
         log.warn("claude", `setModel failed: ${errMsg(err)}`);
       });
@@ -179,6 +212,8 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
         log.warn("claude", `ignoring unknown effort: ${effort}`);
         return;
       }
+      const q = await waitForQuery();
+      if (!q) return;
       await q.applyFlagSettings({ effortLevel: effort }).catch((err) => {
         log.warn("claude", `setEffort failed: ${errMsg(err)}`);
       });
@@ -188,11 +223,15 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
         log.warn("claude", `ignoring unknown permission mode: ${mode}`);
         return;
       }
+      const q = await waitForQuery();
+      if (!q) return;
       await q.setPermissionMode(mode).catch((err) => {
         log.warn("claude", `setPermissionMode failed: ${errMsg(err)}`);
       });
     },
     async listModels() {
+      const q = await waitForQuery();
+      if (!q) return [];
       try {
         const models = await q.supportedModels();
         return models.map((m) => ({ value: m.value, label: m.displayName }));
@@ -202,8 +241,11 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
       }
     },
     interrupt() {
-      void q.interrupt().catch((err) => {
-        log.warn("claude", `interrupt failed: ${errMsg(err)}`);
+      void waitForQuery().then((q) => {
+        if (!q) return;
+        void q.interrupt().catch((err) => {
+          log.warn("claude", `interrupt failed: ${errMsg(err)}`);
+        });
       });
     },
     async close() {
@@ -215,8 +257,18 @@ export function claudeAgent(spawn: AgentSpawn): Agent {
       }
       inbox.close();
       abort.abort();
+      // Swallow startup rejection if it loses the race with close.
+      await queryReady.catch(() => {});
     },
   };
+
+  async function waitForQuery(): Promise<Query | null> {
+    try {
+      return await queryReady;
+    } catch {
+      return null;
+    }
+  }
 }
 
 async function consume(
