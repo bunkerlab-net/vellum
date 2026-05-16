@@ -24,20 +24,11 @@ class BoundedMap<K, V> extends Map<K, V> {
   }
 }
 
-class BoundedSet<T> extends Set<T> {
-  constructor(private readonly cap: number) {
-    super();
-  }
-  override add(value: T): this {
-    if (this.size >= this.cap && !this.has(value)) {
-      const oldest = this.values().next();
-      if (!oldest.done) this.delete(oldest.value);
-    }
-    return super.add(value);
-  }
-}
-
 type ParsedModel = { providerID: string; modelID: string };
+
+// Sentinel stored in `seenTextProgress` once a text part has been finalized via
+// `assistant_text` so we don't double-emit if a trailing update arrives.
+const TEXT_FINALIZED = -1;
 
 function parseModel(spec: string | undefined): ParsedModel | undefined {
   if (!spec) return undefined;
@@ -53,7 +44,11 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
   let closing = false;
   const eventAbort = new AbortController();
   const seenTool = new BoundedMap<string, "started" | "done">(DEDUP_CAP);
-  const seenTextEnd = new BoundedSet<string>(DEDUP_CAP);
+  // OpenCode emits `message.part.updated` with the cumulative `part.text` but
+  // leaves the optional `delta` field unset (verified against SDK 1.15.0), so
+  // we track the last-streamed length per part id and diff locally. `-1`
+  // (TEXT_FINALIZED) marks parts whose `assistant_text` has already shipped.
+  const seenTextProgress = new BoundedMap<string, number>(DEDUP_CAP);
   let queued: Promise<void> = Promise.resolve();
   let currentModel: ParsedModel | undefined = parseModel(spawn.model);
   const campaignsDir = resolve(spawn.cwd, "campaigns");
@@ -189,7 +184,7 @@ export function opencodeAgent(spawn: AgentSpawn): Agent {
             void respondToPermission(ev.properties);
             continue;
           }
-          handleEvent(ev, spawn, seenTool, seenTextEnd);
+          handleEvent(ev, spawn, seenTool, seenTextProgress);
         }
       } catch (err) {
         if (closing) return;
@@ -247,12 +242,12 @@ function handleEvent(
   event: Event,
   spawn: AgentSpawn,
   seenTool: Map<string, "started" | "done">,
-  seenTextEnd: Set<string>,
+  seenTextProgress: Map<string, number>,
 ) {
   if (event.type !== "message.part.updated") return;
-  const { part, delta } = event.properties;
+  const { part } = event.properties;
   if (part.type === "text") {
-    handleTextPart(part, delta, spawn, seenTextEnd);
+    handleTextPart(part, spawn, seenTextProgress);
     return;
   }
   if (part.type === "tool") {
@@ -262,16 +257,23 @@ function handleEvent(
 
 function handleTextPart(
   part: Extract<Part, { type: "text" }>,
-  delta: string | undefined,
   spawn: AgentSpawn,
-  seenTextEnd: Set<string>,
+  seenTextProgress: Map<string, number>,
 ) {
-  if (typeof delta === "string" && delta.length > 0) {
-    spawn.emit({ type: "assistant_partial", text: delta });
-    return;
+  // User-prompt text parts are stored on the session too and arrive over the
+  // same event stream; they carry no `time` field. Assistant-streamed parts
+  // always have `time.start` set. Filter on that to avoid echoing the player's
+  // own prompt back as narrator text.
+  if (!part.time) return;
+  const prev = seenTextProgress.get(part.id);
+  if (prev === TEXT_FINALIZED) return;
+  const streamed = prev ?? 0;
+  if (part.text.length > streamed) {
+    spawn.emit({ type: "assistant_partial", text: part.text.slice(streamed) });
+    seenTextProgress.set(part.id, part.text.length);
   }
-  if (part.time?.end !== undefined && !seenTextEnd.has(part.id)) {
-    seenTextEnd.add(part.id);
+  if (part.time.end !== undefined) {
+    seenTextProgress.set(part.id, TEXT_FINALIZED);
     spawn.emit({ type: "assistant_text", text: part.text });
   }
 }
