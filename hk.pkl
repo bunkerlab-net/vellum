@@ -1,16 +1,15 @@
 // https://hk.jdx.dev
-amends "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Config.pkl"
-import "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Builtins.pkl"
+amends "package://github.com/jdx/hk/releases/download/v1.54.0/hk@1.54.0#/Config.pkl"
 
-exclude = List("**/open_api_specs/**")
+import "package://github.com/jdx/hk/releases/download/v1.54.0/hk@1.54.0#/Builtins.pkl"
 
 local linters = new Mapping<String, Step> {
   // https://hk.jdx.dev/builtins.html
   // Lint JS/TS Files
   ["biome"] = (Builtins.biome) {
     exclude = List(".vscode/*.json", ".zed/*.json")
-    check = "biome check --error-on-warnings --no-errors-on-unmatched {{ files }}"
-    fix = "biome check --write --error-on-warnings --no-errors-on-unmatched {{ files }}"
+    check = "bun biome check --error-on-warnings --no-errors-on-unmatched {{ files }}"
+    fix = "bun biome check --write --error-on-warnings --no-errors-on-unmatched {{ files }}"
   }
   // Detect accidentally committed private keys
   ["detect_private_key"] = Builtins.detect_private_key
@@ -26,7 +25,10 @@ local linters = new Mapping<String, Step> {
   ["pkl_lint"] = Builtins.pkl
   // Format Shell files
   // Ensure `package.json` keys are sorted alphabetically
-  ["sort_package_json"] = Builtins.sort_package_json
+  ["sort_package_json"] = (Builtins.sort_package_json) {
+    check = "bun sort-package-json --check {{ files }}"
+    fix = "bun sort-package-json {{ files }}"
+  }
   // No trailing whitespace allowed
   ["trailing_whitespace"] = Builtins.trailing_whitespace
 }
