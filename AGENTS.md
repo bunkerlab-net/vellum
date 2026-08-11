@@ -131,3 +131,10 @@ entries, session logs. Verify the trailing newline before reporting a save compl
   parenthetical like "for honesty, nothing was actually there" or "you'd not have known either way." The point of the
   check is that the player doesn't know. Out-of-character reassurance destroys the tension and trains the player to dismiss
   failed checks. The DM is allowed — required, even — to keep secrets the dice didn't earn.
+
+## Local Overrides
+
+Machine-local, gitignored instructions live in `CLAUDE.local.md`. Claude Code loads it automatically; OMP loads it via
+this import. If the file is absent the line below is inert.
+
+@CLAUDE.local.md
